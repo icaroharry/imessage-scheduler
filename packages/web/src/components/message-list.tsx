@@ -48,7 +48,7 @@ export function MessageList({ refreshTrigger }: MessageListProps) {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center py-12 text-gray-400">
+      <div className="flex items-center justify-center py-12 text-muted-foreground">
         <Loader2 className="h-5 w-5 animate-spin mr-2" />
         Loading messages...
       </div>
@@ -58,10 +58,10 @@ export function MessageList({ refreshTrigger }: MessageListProps) {
   if (error) {
     return (
       <div className="text-center py-12">
-        <p className="text-sm text-red-500 mb-2">{error}</p>
+        <p className="text-sm text-destructive mb-2">{error}</p>
         <button
           onClick={fetchMessages}
-          className="text-sm text-blue-500 hover:underline"
+          className="text-sm text-primary hover:underline"
         >
           Try again
         </button>
@@ -71,7 +71,7 @@ export function MessageList({ refreshTrigger }: MessageListProps) {
 
   if (messages.length === 0) {
     return (
-      <div className="text-center py-12 text-gray-400">
+      <div className="text-center py-12 text-muted-foreground">
         <p className="text-sm">No messages yet.</p>
         <p className="text-xs mt-1">Schedule your first message above!</p>
       </div>
@@ -87,12 +87,12 @@ export function MessageList({ refreshTrigger }: MessageListProps) {
         <div>
           <div className="flex items-center justify-between mb-3">
             <div className="flex items-center gap-2">
-              <div className="h-2 w-2 rounded-full bg-blue-500" />
-              <h3 className="text-sm font-semibold text-gray-700">
+              <div className="h-2 w-2 rounded-full bg-primary" />
+              <h3 className="text-sm font-semibold">
                 Scheduled Messages
               </h3>
             </div>
-            <span className="text-xs text-gray-400">
+            <span className="text-xs text-muted-foreground">
               ({queuedMessages.length})
             </span>
           </div>
@@ -113,11 +113,11 @@ export function MessageList({ refreshTrigger }: MessageListProps) {
           <div className="flex items-center justify-between mb-3">
             <div className="flex items-center gap-2">
               <div className="h-2 w-2 rounded-full bg-emerald-500" />
-              <h3 className="text-sm font-semibold text-gray-700">
+              <h3 className="text-sm font-semibold">
                 Processed Messages
               </h3>
             </div>
-            <span className="text-xs text-gray-400">
+            <span className="text-xs text-muted-foreground">
               ({otherMessages.length})
             </span>
           </div>

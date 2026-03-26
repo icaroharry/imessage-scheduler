@@ -17,11 +17,11 @@ import type { Message, MessageStatus } from "@/lib/api";
 import { Loader2, RefreshCw } from "lucide-react";
 
 const statusColors: Record<MessageStatus, string> = {
-  QUEUED: "bg-gray-100 text-gray-700",
-  ACCEPTED: "bg-blue-100 text-blue-700",
-  SENT: "bg-indigo-100 text-indigo-700",
+  QUEUED: "bg-secondary text-secondary-foreground",
+  ACCEPTED: "bg-primary/10 text-primary",
+  SENT: "bg-accent text-accent-foreground",
   DELIVERED: "bg-emerald-100 text-emerald-700",
-  FAILED: "bg-red-100 text-red-700",
+  FAILED: "bg-destructive/10 text-destructive",
 };
 
 const statusFilters: { label: string; value: MessageStatus | "ALL" }[] = [
@@ -79,10 +79,10 @@ export function MessageTable() {
   }, [fetchMessages]);
 
   return (
-    <Card className="border-0 shadow-sm bg-white/70 backdrop-blur-sm">
+    <Card>
       <CardHeader className="pb-3">
         <div className="flex items-center justify-between">
-          <CardTitle className="text-lg font-semibold text-gray-800">
+          <CardTitle className="text-lg font-semibold">
             All Messages
           </CardTitle>
           <Button
@@ -92,7 +92,7 @@ export function MessageTable() {
               setLoading(true);
               fetchMessages();
             }}
-            className="text-gray-400 hover:text-gray-600"
+            className="text-muted-foreground"
           >
             <RefreshCw className="h-4 w-4" />
           </Button>
@@ -104,11 +104,7 @@ export function MessageTable() {
               variant={filter === f.value ? "default" : "ghost"}
               size="sm"
               onClick={() => setFilter(f.value)}
-              className={`text-xs h-7 ${
-                filter === f.value
-                  ? "bg-gray-900 text-white"
-                  : "text-gray-500 hover:text-gray-800"
-              }`}
+              className="text-xs h-7"
             >
               {f.label}
             </Button>
@@ -117,12 +113,12 @@ export function MessageTable() {
       </CardHeader>
       <CardContent>
         {loading ? (
-          <div className="flex items-center justify-center py-8 text-gray-400">
+          <div className="flex items-center justify-center py-8 text-muted-foreground">
             <Loader2 className="h-5 w-5 animate-spin mr-2" />
             Loading...
           </div>
         ) : messages.length === 0 ? (
-          <div className="text-center py-8 text-gray-400 text-sm">
+          <div className="text-center py-8 text-muted-foreground text-sm">
             No messages found.
           </div>
         ) : (
@@ -141,15 +137,15 @@ export function MessageTable() {
               </TableHeader>
               <TableBody>
                 {messages.map((msg) => (
-                  <TableRow key={msg.id} className="hover:bg-white/50">
-                    <TableCell className="font-mono text-xs text-gray-400">
+                  <TableRow key={msg.id}>
+                    <TableCell className="font-mono text-xs text-muted-foreground">
                       #{msg.id}
                     </TableCell>
                     <TableCell className="font-medium text-sm">
                       {msg.phone}
                     </TableCell>
                     <TableCell
-                      className="text-sm text-gray-600 max-w-[300px]"
+                      className="text-sm text-muted-foreground max-w-[300px]"
                       title={msg.body}
                     >
                       {truncate(msg.body, 60)}
@@ -161,13 +157,13 @@ export function MessageTable() {
                         {msg.status}
                       </Badge>
                     </TableCell>
-                    <TableCell className="text-xs text-gray-500">
+                    <TableCell className="text-xs text-muted-foreground">
                       {formatDate(msg.createdAt)}
                     </TableCell>
-                    <TableCell className="text-xs text-gray-500">
+                    <TableCell className="text-xs text-muted-foreground">
                       {formatDate(msg.sentAt)}
                     </TableCell>
-                    <TableCell className="text-xs text-red-500 max-w-[200px]">
+                    <TableCell className="text-xs text-destructive max-w-[200px]">
                       {msg.errorMessage
                         ? truncate(msg.errorMessage, 40)
                         : "-"}

@@ -18,29 +18,29 @@ const statCards = [
     key: "total" as const,
     label: "Total",
     icon: MessageSquare,
-    color: "text-gray-600",
-    bg: "bg-gray-50",
+    color: "text-foreground",
+    bg: "bg-secondary",
   },
   {
     key: "queued" as const,
     label: "Queued",
     icon: Clock,
-    color: "text-blue-600",
-    bg: "bg-blue-50",
+    color: "text-primary",
+    bg: "bg-primary/10",
   },
   {
     key: "accepted" as const,
     label: "Accepted",
     icon: Zap,
-    color: "text-indigo-600",
-    bg: "bg-indigo-50",
+    color: "text-accent-foreground",
+    bg: "bg-accent",
   },
   {
     key: "sent" as const,
     label: "Sent",
     icon: Send,
-    color: "text-violet-600",
-    bg: "bg-violet-50",
+    color: "text-primary",
+    bg: "bg-primary/10",
   },
   {
     key: "delivered" as const,
@@ -53,8 +53,8 @@ const statCards = [
     key: "failed" as const,
     label: "Failed",
     icon: XCircle,
-    color: "text-red-600",
-    bg: "bg-red-50",
+    color: "text-destructive",
+    bg: "bg-destructive/10",
   },
 ];
 
@@ -80,12 +80,9 @@ export function DashboardStats() {
     return (
       <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
         {statCards.map((card) => (
-          <Card
-            key={card.key}
-            className="border-0 shadow-sm bg-white/70 backdrop-blur-sm"
-          >
+          <Card key={card.key}>
             <CardContent className="py-4 px-4">
-              <div className="h-12 animate-pulse bg-gray-100 rounded" />
+              <div className="h-12 animate-pulse bg-muted rounded" />
             </CardContent>
           </Card>
         ))}
@@ -98,10 +95,7 @@ export function DashboardStats() {
       {statCards.map((card) => {
         const Icon = card.icon;
         return (
-          <Card
-            key={card.key}
-            className="border-0 shadow-sm bg-white/70 backdrop-blur-sm hover:bg-white/90 transition-colors"
-          >
+          <Card key={card.key} className="transition-colors hover:bg-accent/30">
             <CardContent className="py-4 px-4">
               <div className="flex items-center gap-2 mb-1">
                 <div
@@ -111,10 +105,10 @@ export function DashboardStats() {
                 </div>
               </div>
               <div className="mt-2">
-                <div className="text-2xl font-bold text-gray-900">
+                <div className="text-2xl font-bold">
                   {stats[card.key]}
                 </div>
-                <div className="text-xs text-gray-500">{card.label}</div>
+                <div className="text-xs text-muted-foreground">{card.label}</div>
               </div>
             </CardContent>
           </Card>

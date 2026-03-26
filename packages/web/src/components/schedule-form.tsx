@@ -39,13 +39,13 @@ export function ScheduleForm({ onMessageCreated }: ScheduleFormProps) {
   };
 
   return (
-    <Card className="shadow-lg border-0 bg-white/80 backdrop-blur-sm">
+    <Card>
       <CardContent className="pt-6">
         <form onSubmit={handleSubmit} className="space-y-5">
           <div className="space-y-2">
             <label
               htmlFor="phone"
-              className="text-sm font-medium text-gray-700"
+              className="text-sm font-medium"
             >
               Phone Number
             </label>
@@ -56,14 +56,14 @@ export function ScheduleForm({ onMessageCreated }: ScheduleFormProps) {
               value={phone}
               onChange={(e) => setPhone(e.target.value)}
               required
-              className="h-12 rounded-xl border-gray-200 bg-gray-50/50 focus:bg-white transition-colors"
+              className="h-11"
             />
           </div>
 
           <div className="space-y-2">
             <label
               htmlFor="message"
-              className="text-sm font-medium text-gray-700"
+              className="text-sm font-medium"
             >
               Message
             </label>
@@ -75,15 +75,15 @@ export function ScheduleForm({ onMessageCreated }: ScheduleFormProps) {
               required
               rows={4}
               maxLength={2000}
-              className="rounded-xl border-gray-200 bg-gray-50/50 focus:bg-white transition-colors resize-none"
+              className="resize-none"
             />
-            <div className="text-xs text-gray-400 text-right">
+            <div className="text-xs text-muted-foreground text-right">
               {body.length}/2000
             </div>
           </div>
 
           {error && (
-            <div className="text-sm text-red-600 bg-red-50 rounded-lg p-3">
+            <div className="text-sm text-destructive bg-destructive/10 rounded-lg p-3">
               {error}
             </div>
           )}
@@ -97,7 +97,7 @@ export function ScheduleForm({ onMessageCreated }: ScheduleFormProps) {
           <Button
             type="submit"
             disabled={isPending || !phone || !body}
-            className="w-full h-12 rounded-xl text-base font-semibold bg-gradient-to-r from-blue-500 to-violet-500 hover:from-blue-600 hover:to-violet-600 shadow-md shadow-blue-500/25 transition-all duration-200"
+            className="w-full h-11 text-base font-semibold"
           >
             <Send className="mr-2 h-4 w-4" />
             {isPending ? "Scheduling..." : "Schedule Message"}
