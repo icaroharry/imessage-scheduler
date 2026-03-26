@@ -1,0 +1,14 @@
+node_modules
+dist
+.next
+*.db
+*.db-journal
+*.db-shm
+*.db-wal
+.env
+.env.local
+.turbo
+.vercel
+
+# Nested lockfiles (root pnpm-lock.yaml is the source of truth)
+packages/web/pnpm-lock.yaml
