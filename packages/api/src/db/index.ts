@@ -1,3 +1,5 @@
+import { mkdirSync, existsSync } from "node:fs";
+import { dirname } from "node:path";
 import Database from "better-sqlite3";
 import { drizzle, BetterSQLite3Database } from "drizzle-orm/better-sqlite3";
 import * as schema from "./schema.js";
@@ -5,6 +7,12 @@ import * as schema from "./schema.js";
 export type AppDatabase = BetterSQLite3Database<typeof schema>;
 
 export function createDatabase(url: string = "./data/scheduler.db"): AppDatabase {
+  // Ensure the directory for the database file exists
+  const dir = dirname(url);
+  if (!existsSync(dir)) {
+    mkdirSync(dir, { recursive: true });
+  }
+
   const sqlite = new Database(url);
   sqlite.pragma("journal_mode = WAL");
   sqlite.pragma("foreign_keys = ON");
