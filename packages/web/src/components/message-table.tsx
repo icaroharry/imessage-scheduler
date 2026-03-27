@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useCallback } from "react";
+import { useMemo, useState } from "react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -12,9 +12,9 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { api } from "@/lib/api";
-import type { Message, MessageStatus } from "@/lib/api";
-import { Loader2, RefreshCw } from "lucide-react";
+import type { MessageStatus } from "@/lib/api";
+import { useSSEData } from "@/components/sse-provider";
+import { Loader2 } from "lucide-react";
 
 const statusDisplay: Record<MessageStatus, { label: string; className: string; spinning?: boolean }> = {
   QUEUED: { label: "Queued", className: "bg-secondary text-secondary-foreground" },
@@ -50,33 +50,18 @@ function truncate(str: string, maxLen: number): string {
 }
 
 export function MessageTable() {
-  const [messages, setMessages] = useState<Message[]>([]);
-  const [loading, setLoading] = useState(true);
+  const { messages, connected } = useSSEData();
   const [filter, setFilter] = useState<MessageStatus | "ALL">("ALL");
 
-  const fetchMessages = useCallback(async () => {
-    try {
-      const params: { status?: MessageStatus; limit: number } = { limit: 100 };
-      if (filter !== "ALL") params.status = filter;
-      const result = await api.getMessages(params);
-      setMessages(result.data);
-    } catch (err) {
-      console.error("Failed to fetch messages:", err);
-    } finally {
-      setLoading(false);
-    }
-  }, [filter]);
+  const filtered = useMemo(
+    () =>
+      filter === "ALL"
+        ? messages
+        : messages.filter((m) => m.status === filter),
+    [messages, filter],
+  );
 
-  useEffect(() => {
-    setLoading(true);
-    fetchMessages();
-  }, [fetchMessages]);
-
-  // Auto-refresh every 10 seconds
-  useEffect(() => {
-    const interval = setInterval(fetchMessages, 10000);
-    return () => clearInterval(interval);
-  }, [fetchMessages]);
+  const loading = !connected && messages.length === 0;
 
   return (
     <Card>
@@ -85,17 +70,6 @@ export function MessageTable() {
           <CardTitle className="text-lg font-semibold">
             All Messages
           </CardTitle>
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={() => {
-              setLoading(true);
-              fetchMessages();
-            }}
-            className="text-muted-foreground"
-          >
-            <RefreshCw className="h-4 w-4" />
-          </Button>
         </div>
         <div className="flex gap-1 flex-wrap">
           {statusFilters.map((f) => (
@@ -117,7 +91,7 @@ export function MessageTable() {
             <Loader2 className="h-5 w-5 animate-spin mr-2" />
             Loading...
           </div>
-        ) : messages.length === 0 ? (
+        ) : filtered.length === 0 ? (
           <div className="text-center py-8 text-muted-foreground text-sm">
             No messages found.
           </div>
@@ -136,7 +110,7 @@ export function MessageTable() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {messages.map((msg) => (
+                {filtered.map((msg) => (
                   <TableRow key={msg.id}>
                     <TableCell className="font-mono text-xs text-muted-foreground">
                       #{msg.id}

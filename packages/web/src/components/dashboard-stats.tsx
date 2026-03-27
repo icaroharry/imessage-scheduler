@@ -1,10 +1,8 @@
 "use client";
 
-import { useEffect, useState } from "react";
 import { motion } from "motion/react";
 import { Card, CardContent } from "@/components/ui/card";
-import { api } from "@/lib/api";
-import type { Stats } from "@/lib/api";
+import { useSSEData } from "@/components/sse-provider";
 import {
   Clock,
   CheckCircle2,
@@ -65,22 +63,7 @@ const statCards = [
 ];
 
 export function DashboardStats() {
-  const [stats, setStats] = useState<Stats | null>(null);
-
-  useEffect(() => {
-    const fetchStats = async () => {
-      try {
-        const result = await api.getStats();
-        setStats(result.data);
-      } catch (err) {
-        console.error("Failed to fetch stats:", err);
-      }
-    };
-
-    fetchStats();
-    const interval = setInterval(fetchStats, 10000);
-    return () => clearInterval(interval);
-  }, []);
+  const { stats } = useSSEData();
 
   if (!stats) {
     return (

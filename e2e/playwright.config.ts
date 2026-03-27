@@ -33,12 +33,12 @@ const webServers: Array<{
 
 if (startNextServer) {
   webServers.push({
-    command: "npx next start ../packages/web -p 3000",
+    command: "pnpm --filter @imessage-scheduler/web exec next start",
     port: 3000,
     reuseExistingServer: false,
     stdout: "pipe",
     stderr: "pipe",
-    timeout: 15_000,
+    timeout: 30_000,
   });
 }
 

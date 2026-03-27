@@ -3,6 +3,8 @@ import { z } from "zod";
 import { eq, desc, sql, count } from "drizzle-orm";
 import { messages } from "../db/schema.js";
 import type { AppDatabase } from "../db/index.js";
+import { emit } from "../events.js";
+import type { Stats } from "../events.js";
 
 type Env = {
   Variables: {
@@ -30,6 +32,27 @@ const updateMessageSchema = z.object({
   sentAt: z.string().datetime().nullable().optional(),
   deliveredAt: z.string().datetime().nullable().optional(),
 });
+
+/** Compute aggregated stats — shared between the route handler and SSE emission */
+export function computeStats(db: AppDatabase): Stats {
+  const rows = db
+    .select({ status: messages.status, count: count() })
+    .from(messages)
+    .groupBy(messages.status)
+    .all();
+
+  const total = rows.reduce((acc, s) => acc + s.count, 0);
+  const byStatus = Object.fromEntries(rows.map((s) => [s.status, s.count]));
+
+  return {
+    total,
+    queued: byStatus.QUEUED || 0,
+    accepted: byStatus.ACCEPTED || 0,
+    sent: byStatus.SENT || 0,
+    delivered: byStatus.DELIVERED || 0,
+    failed: byStatus.FAILED || 0,
+  };
+}
 
 export const messagesRouter = new Hono<Env>()
   // List all messages with optional status filter
@@ -120,6 +143,9 @@ export const messagesRouter = new Hono<Env>()
       .returning()
       .get();
 
+    emit({ type: "message:created", data: result });
+    emit({ type: "stats:updated", data: computeStats(db) });
+
     return c.json({ data: result }, 201);
   })
 
@@ -174,6 +200,9 @@ export const messagesRouter = new Hono<Env>()
       .returning()
       .get();
 
+    emit({ type: "message:updated", data: result });
+    emit({ type: "stats:updated", data: computeStats(db) });
+
     return c.json({ data: result });
   })
 
@@ -204,34 +233,14 @@ export const messagesRouter = new Hono<Env>()
 
     db.delete(messages).where(eq(messages.id, id)).run();
 
+    emit({ type: "message:deleted", data: { id } });
+    emit({ type: "stats:updated", data: computeStats(db) });
+
     return c.json({ message: "Message deleted" });
   })
 
   // Get dashboard stats
   .get("/stats/summary", async (c) => {
     const db = c.get("db");
-
-    const stats = await db
-      .select({
-        status: messages.status,
-        count: count(),
-      })
-      .from(messages)
-      .groupBy(messages.status);
-
-    const total = stats.reduce((acc, s) => acc + s.count, 0);
-    const byStatus = Object.fromEntries(
-      stats.map((s) => [s.status, s.count]),
-    );
-
-    return c.json({
-      data: {
-        total,
-        queued: byStatus.QUEUED || 0,
-        accepted: byStatus.ACCEPTED || 0,
-        sent: byStatus.SENT || 0,
-        delivered: byStatus.DELIVERED || 0,
-        failed: byStatus.FAILED || 0,
-      },
-    });
+    return c.json({ data: computeStats(db) });
   });

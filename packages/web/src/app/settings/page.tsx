@@ -83,8 +83,7 @@ export default function SettingsPage() {
   useEffect(() => {
     const checkGateway = async () => {
       try {
-        const res = await fetch("http://localhost:3002/health");
-        const data = await res.json();
+        const data = await api.getGatewayHealth();
         setGatewayHealth(data);
       } catch {
         setGatewayHealth(null);
@@ -170,12 +169,7 @@ export default function SettingsPage() {
                       onClick={async () => {
                         setOpeningSettings(true);
                         try {
-                          await fetch(
-                            "http://localhost:3002/open-fda-settings",
-                            {
-                              method: "POST",
-                            }
-                          );
+                          await api.openFDASettings();
                         } catch {
                           // fallback: tell user to open manually
                         } finally {

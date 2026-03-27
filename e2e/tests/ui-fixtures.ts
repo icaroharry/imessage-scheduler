@@ -17,6 +17,19 @@ export const test = base.extend({
         "http://localhost:3001",
         "http://localhost:3051",
       );
+
+      // SSE streams can't use route.fetch() — it never resolves because the
+      // response is an infinite stream. Use route.continue() to let the
+      // browser handle the connection directly.
+      const isSSE =
+        originalUrl.includes("/events") ||
+        route.request().headers()["accept"]?.includes("text/event-stream");
+
+      if (isSSE) {
+        await route.continue({ url: redirectedUrl });
+        return;
+      }
+
       const response = await route.fetch({ url: redirectedUrl });
       await route.fulfill({ response });
     });
@@ -38,6 +51,10 @@ export const test = base.extend({
     });
 
     await use(page);
+
+    // Clean up routes to avoid errors when the page/context closes
+    // while SSE streams are still open
+    await page.unrouteAll({ behavior: "ignoreErrors" });
   },
 });
 

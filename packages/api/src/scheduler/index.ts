@@ -1,6 +1,8 @@
 import { eq, asc, lte, or, isNull } from "drizzle-orm";
 import { messages, config } from "../db/schema.js";
 import type { AppDatabase } from "../db/index.js";
+import { emit } from "../events.js";
+import { computeStats } from "../routes/messages.js";
 
 export interface SchedulerOptions {
   db: AppDatabase;
@@ -65,14 +67,18 @@ export class MessageScheduler {
       }
 
       // Mark as ACCEPTED
-      this.db
+      const accepted = this.db
         .update(messages)
         .set({
           status: "ACCEPTED",
           updatedAt: new Date().toISOString(),
         })
         .where(eq(messages.id, next.id))
-        .run();
+        .returning()
+        .get();
+
+      emit({ type: "message:updated", data: accepted });
+      emit({ type: "stats:updated", data: computeStats(this.db) });
 
       // Try to send via gateway
       try {
@@ -116,7 +122,7 @@ export class MessageScheduler {
           error instanceof Error ? error.message : "Unknown error";
         console.error(`[Scheduler] Failed to send message ${next.id}:`, errorMsg);
 
-        this.db
+        const failed = this.db
           .update(messages)
           .set({
             status: "FAILED",
@@ -124,7 +130,11 @@ export class MessageScheduler {
             updatedAt: new Date().toISOString(),
           })
           .where(eq(messages.id, next.id))
-          .run();
+          .returning()
+          .get();
+
+        emit({ type: "message:updated", data: failed });
+        emit({ type: "stats:updated", data: computeStats(this.db) });
 
         return false;
       }
