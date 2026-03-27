@@ -34,8 +34,8 @@ export function createGatewayApp(
   );
 
   // Health check with system info
-  app.get("/health", (c) => {
-    const info = tracker.getSystemInfo();
+  app.get("/health", async (c) => {
+    const info = await tracker.getSystemInfo();
     return c.json({
       status: "ok",
       timestamp: new Date().toISOString(),
