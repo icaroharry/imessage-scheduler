@@ -1,9 +1,10 @@
 import { defineConfig, devices } from "@playwright/test";
 
 const isCI = !!process.env.CI;
+const startNextServer = !!process.env.E2E_START_NEXT;
 
-// In CI, Playwright starts the Next.js production server automatically.
-// Locally, you run `pnpm dev` yourself.
+// In CI browser job, E2E_START_NEXT=true tells Playwright to start the
+// Next.js production server. Locally, you run `pnpm dev` yourself.
 const webServers: Array<{
   command: string;
   port: number;
@@ -30,7 +31,7 @@ const webServers: Array<{
   },
 ];
 
-if (isCI) {
+if (startNextServer) {
   webServers.push({
     command: "npx next start ../packages/web -p 3000",
     port: 3000,
