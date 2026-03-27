@@ -1,9 +1,50 @@
 import { defineConfig, devices } from "@playwright/test";
 
+const isCI = !!process.env.CI;
+
+// In CI, Playwright starts the Next.js production server automatically.
+// Locally, you run `pnpm dev` yourself.
+const webServers: Array<{
+  command: string;
+  port: number;
+  reuseExistingServer: boolean;
+  stdout: "pipe";
+  stderr: "pipe";
+  timeout: number;
+}> = [
+  {
+    command: "npx tsx api-server.ts",
+    port: 3051,
+    reuseExistingServer: !isCI,
+    stdout: "pipe",
+    stderr: "pipe",
+    timeout: 10_000,
+  },
+  {
+    command: "npx tsx mock-gateway.ts",
+    port: 3052,
+    reuseExistingServer: !isCI,
+    stdout: "pipe",
+    stderr: "pipe",
+    timeout: 10_000,
+  },
+];
+
+if (isCI) {
+  webServers.push({
+    command: "npx next start ../packages/web -p 3000",
+    port: 3000,
+    reuseExistingServer: false,
+    stdout: "pipe",
+    stderr: "pipe",
+    timeout: 15_000,
+  });
+}
+
 export default defineConfig({
   testDir: "./tests",
   timeout: 30_000,
-  retries: 0,
+  retries: isCI ? 1 : 0,
   workers: 1, // Sequential — tests share the same API server + DB
 
   projects: [
@@ -16,30 +57,13 @@ export default defineConfig({
       name: "browser",
       testMatch: "ui-*.test.ts",
       use: {
-        // Use the existing Next.js dev server (started via `pnpm dev`)
-        // API calls are intercepted and redirected to the e2e API via fixtures
+        // Locally: existing Next.js dev server via `pnpm dev`
+        // CI: Next.js production server started by Playwright (see webServer above)
         baseURL: "http://localhost:3000",
         ...devices["Desktop Chrome"],
       },
     },
   ],
 
-  webServer: [
-    {
-      command: "npx tsx api-server.ts",
-      port: 3051,
-      reuseExistingServer: !process.env.CI,
-      stdout: "pipe",
-      stderr: "pipe",
-      timeout: 10_000,
-    },
-    {
-      command: "npx tsx mock-gateway.ts",
-      port: 3052,
-      reuseExistingServer: !process.env.CI,
-      stdout: "pipe",
-      stderr: "pipe",
-      timeout: 10_000,
-    },
-  ],
+  webServer: webServers,
 });

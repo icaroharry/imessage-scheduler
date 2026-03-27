@@ -10,5 +10,10 @@ dist
 .turbo
 .vercel
 
+# Playwright
+e2e/test-results/
+e2e/playwright-report/
+
 # Nested lockfiles (root pnpm-lock.yaml is the source of truth)
 packages/web/pnpm-lock.yaml
+packages/web/package-lock.json
