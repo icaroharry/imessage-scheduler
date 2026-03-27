@@ -55,6 +55,8 @@ describe("StatusTracker", () => {
       );
       expect(body.status).toBe("SENT");
       expect(body.sentAt).toBeDefined();
+      expect(body.deliveredAt).toBeUndefined();
+      expect(body.errorMessage).toBeUndefined();
     });
 
     it("should PATCH the API with DELIVERED status and deliveredAt", async () => {
@@ -65,6 +67,7 @@ describe("StatusTracker", () => {
       );
       expect(body.status).toBe("DELIVERED");
       expect(body.deliveredAt).toBeDefined();
+      expect(body.sentAt).toBeUndefined();
     });
 
     it("should include errorMessage for FAILED status", async () => {
@@ -75,6 +78,57 @@ describe("StatusTracker", () => {
       );
       expect(body.status).toBe("FAILED");
       expect(body.errorMessage).toBe("osascript crashed");
+      expect(body.sentAt).toBeUndefined();
+      expect(body.deliveredAt).toBeUndefined();
+    });
+
+    it("retries failed status updates with exponential backoff until success", async () => {
+      vi.mocked(global.fetch)
+        .mockResolvedValueOnce({
+          ok: false,
+          status: 500,
+          json: () => Promise.resolve({ error: "fail" }),
+        } as Response)
+        .mockResolvedValueOnce({
+          ok: false,
+          status: 502,
+          json: () => Promise.resolve({ error: "still failing" }),
+        } as Response)
+        .mockResolvedValueOnce({
+          ok: true,
+          json: () => Promise.resolve({ data: {} }),
+        } as Response);
+
+      const pending = tracker.reportStatus(1, "FAILED", "retry me");
+
+      await vi.advanceTimersByTimeAsync(0);
+      expect(global.fetch).toHaveBeenCalledTimes(1);
+
+      await vi.advanceTimersByTimeAsync(1000);
+      expect(global.fetch).toHaveBeenCalledTimes(2);
+
+      await vi.advanceTimersByTimeAsync(2000);
+      expect(global.fetch).toHaveBeenCalledTimes(3);
+
+      await pending;
+    });
+
+    it("gives up after three failed attempts", async () => {
+      const errorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+      vi.mocked(global.fetch).mockRejectedValue(new Error("network down"));
+
+      const pending = tracker.reportStatus(9, "SENT");
+
+      await vi.advanceTimersByTimeAsync(0);
+      await vi.advanceTimersByTimeAsync(1000);
+      await vi.advanceTimersByTimeAsync(2000);
+      await pending;
+
+      expect(global.fetch).toHaveBeenCalledTimes(3);
+      expect(errorSpy).toHaveBeenCalledWith(
+        expect.stringContaining("GAVE UP reporting SENT for message 9 after 3 attempts"),
+      );
+      errorSpy.mockRestore();
     });
   });
 
@@ -332,6 +386,35 @@ describe("StatusTracker", () => {
       const lastBody = JSON.parse((calls[calls.length - 1][1] as any).body);
       expect(lastBody.status).toBe("FAILED");
       expect(lastBody.errorMessage).toContain("not found in Messages.app");
+    });
+
+    it("should report SENT on timeout when the message is found but still in transit", async () => {
+      mockedIsChatDbAvailable.mockReturnValue(true);
+      mockedCheckDelivery.mockReturnValue({
+        delivered: false,
+        found: true,
+        accessError: false,
+        sendFailed: false,
+        rowid: 42,
+      });
+
+      tracker.trackDelivery({
+        messageId: 1,
+        phone: "+15551234567",
+        body: "Hello",
+        sentAt: new Date(),
+        pollIntervalMs: 1000,
+        timeoutMs: 3000,
+      });
+
+      await vi.advanceTimersByTimeAsync(3000);
+      await vi.advanceTimersByTimeAsync(0);
+
+      expect(global.fetch).toHaveBeenCalledTimes(1);
+      const body = JSON.parse(
+        (vi.mocked(global.fetch).mock.calls[0][1] as any).body,
+      );
+      expect(body.status).toBe("SENT");
     });
 
     it("should stop polling after delivery is confirmed", async () => {
