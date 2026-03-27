@@ -7,7 +7,7 @@ vi.mock("node:child_process", () => ({
 }));
 
 vi.mock("node:util", () => ({
-  promisify: vi.fn((fn: Function) => {
+  promisify: vi.fn((fn: (...args: unknown[]) => void) => {
     return (...args: unknown[]) => {
       return new Promise((resolve, reject) => {
         fn(...args, (err: Error | null, result: unknown) => {
@@ -43,10 +43,10 @@ describe("iMessage Module", () => {
 
       const mockedExecFile = vi.mocked(execFile);
       mockedExecFile.mockImplementation(
-        (_cmd: string, _args: any, _opts: any, callback: any) => {
-          if (callback) callback(null, "");
-          return {} as any;
-        },
+        ((_cmd: string, _args: unknown, _opts: unknown, callback: unknown) => {
+          if (callback) (callback as (err: Error | null, result: string) => void)(null, "");
+          return {} as ReturnType<typeof execFile>;
+        }) as typeof execFile,
       );
 
       const { sendIMessage } = await import("../src/imessage.js");
@@ -71,10 +71,10 @@ describe("iMessage Module", () => {
 
       const mockedExecFile = vi.mocked(execFile);
       mockedExecFile.mockImplementation(
-        (_cmd: string, _args: any, _opts: any, callback: any) => {
-          if (callback) callback(null, "");
-          return {} as any;
-        },
+        ((_cmd: string, _args: unknown, _opts: unknown, callback: unknown) => {
+          if (callback) (callback as (err: Error | null, result: string) => void)(null, "");
+          return {} as ReturnType<typeof execFile>;
+        }) as typeof execFile,
       );
 
       const { sendIMessage } = await import("../src/imessage.js");
@@ -98,10 +98,10 @@ describe("iMessage Module", () => {
 
       const mockedExecFile = vi.mocked(execFile);
       mockedExecFile.mockImplementation(
-        (_cmd: string, _args: any, _opts: any, callback: any) => {
-          if (callback) callback(new Error("execution error: Can't get buddy \"+15550000000\" (-1728)"));
-          return {} as any;
-        },
+        ((_cmd: string, _args: unknown, _opts: unknown, callback: unknown) => {
+          if (callback) (callback as (err: Error | null, result: string) => void)(new Error("execution error: Can't get buddy \"+15550000000\" (-1728)"), "");
+          return {} as ReturnType<typeof execFile>;
+        }) as typeof execFile,
       );
 
       const { sendIMessage } = await import("../src/imessage.js");

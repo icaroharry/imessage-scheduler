@@ -305,12 +305,12 @@ export class StatusTracker {
   }
 
   /** Check system capabilities */
-  getSystemInfo() {
+  async getSystemInfo() {
     return {
       platform: process.platform,
       isMacOS: process.platform === "darwin",
       chatDbAvailable: isChatDbAvailable(),
-      chatDbReadable: isChatDbReadable(),
+      chatDbReadable: await isChatDbReadable(),
       chatDbPath: getChatDbPath(),
     };
   }

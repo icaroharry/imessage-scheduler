@@ -51,7 +51,7 @@ describe("StatusTracker", () => {
       );
 
       const body = JSON.parse(
-        (vi.mocked(global.fetch).mock.calls[0][1] as any).body,
+        (vi.mocked(global.fetch).mock.calls[0][1] as RequestInit).body,
       );
       expect(body.status).toBe("SENT");
       expect(body.sentAt).toBeDefined();
@@ -63,7 +63,7 @@ describe("StatusTracker", () => {
       await tracker.reportStatus(1, "DELIVERED");
 
       const body = JSON.parse(
-        (vi.mocked(global.fetch).mock.calls[0][1] as any).body,
+        (vi.mocked(global.fetch).mock.calls[0][1] as RequestInit).body,
       );
       expect(body.status).toBe("DELIVERED");
       expect(body.deliveredAt).toBeDefined();
@@ -74,7 +74,7 @@ describe("StatusTracker", () => {
       await tracker.reportStatus(1, "FAILED", "osascript crashed");
 
       const body = JSON.parse(
-        (vi.mocked(global.fetch).mock.calls[0][1] as any).body,
+        (vi.mocked(global.fetch).mock.calls[0][1] as RequestInit).body,
       );
       expect(body.status).toBe("FAILED");
       expect(body.errorMessage).toBe("osascript crashed");
@@ -149,10 +149,10 @@ describe("StatusTracker", () => {
       const calls = vi.mocked(global.fetch).mock.calls;
       expect(calls.length).toBeGreaterThanOrEqual(2);
 
-      const sentBody = JSON.parse((calls[0][1] as any).body);
+      const sentBody = JSON.parse((calls[0][1] as RequestInit).body);
       expect(sentBody.status).toBe("SENT");
 
-      const deliveredBody = JSON.parse((calls[1][1] as any).body);
+      const deliveredBody = JSON.parse((calls[1][1] as RequestInit).body);
       expect(deliveredBody.status).toBe("DELIVERED");
     });
 
@@ -178,10 +178,10 @@ describe("StatusTracker", () => {
       const calls = vi.mocked(global.fetch).mock.calls;
       expect(calls.length).toBeGreaterThanOrEqual(2);
 
-      const sentBody = JSON.parse((calls[0][1] as any).body);
+      const sentBody = JSON.parse((calls[0][1] as RequestInit).body);
       expect(sentBody.status).toBe("SENT");
 
-      const deliveredBody = JSON.parse((calls[1][1] as any).body);
+      const deliveredBody = JSON.parse((calls[1][1] as RequestInit).body);
       expect(deliveredBody.status).toBe("DELIVERED");
 
       // Should NOT start polling
@@ -210,10 +210,10 @@ describe("StatusTracker", () => {
       const calls = vi.mocked(global.fetch).mock.calls;
       expect(calls.length).toBeGreaterThanOrEqual(2);
 
-      const sentBody = JSON.parse((calls[0][1] as any).body);
+      const sentBody = JSON.parse((calls[0][1] as RequestInit).body);
       expect(sentBody.status).toBe("SENT");
 
-      const deliveredBody = JSON.parse((calls[1][1] as any).body);
+      const deliveredBody = JSON.parse((calls[1][1] as RequestInit).body);
       expect(deliveredBody.status).toBe("DELIVERED");
       expect(deliveredBody.deliveredAt).toBeDefined();
     });
@@ -245,7 +245,7 @@ describe("StatusTracker", () => {
       await vi.advanceTimersByTimeAsync(0);
       expect(global.fetch).toHaveBeenCalledTimes(1);
       const sentBody = JSON.parse(
-        (vi.mocked(global.fetch).mock.calls[0][1] as any).body,
+        (vi.mocked(global.fetch).mock.calls[0][1] as RequestInit).body,
       );
       expect(sentBody.status).toBe("SENT");
 
@@ -255,7 +255,7 @@ describe("StatusTracker", () => {
       await vi.advanceTimersByTimeAsync(0);
       expect(global.fetch).toHaveBeenCalledTimes(2);
       const deliveredBody = JSON.parse(
-        (vi.mocked(global.fetch).mock.calls[1][1] as any).body,
+        (vi.mocked(global.fetch).mock.calls[1][1] as RequestInit).body,
       );
       expect(deliveredBody.status).toBe("DELIVERED");
     });
@@ -284,7 +284,7 @@ describe("StatusTracker", () => {
       expect(global.fetch).toHaveBeenCalled();
       const calls = vi.mocked(global.fetch).mock.calls;
       const statuses = calls.map(
-        (c) => JSON.parse((c[1] as any).body).status,
+        (c) => JSON.parse((c[1] as RequestInit).body).status,
       );
       expect(statuses).toContain("SENT");
       expect(statuses).toContain("DELIVERED");
@@ -326,7 +326,7 @@ describe("StatusTracker", () => {
 
       expect(global.fetch).toHaveBeenCalledTimes(1);
       const body = JSON.parse(
-        (vi.mocked(global.fetch).mock.calls[0][1] as any).body,
+        (vi.mocked(global.fetch).mock.calls[0][1] as RequestInit).body,
       );
       expect(body.status).toBe("FAILED");
       expect(body.errorMessage).toContain("Messages.app failed to deliver");
@@ -359,7 +359,7 @@ describe("StatusTracker", () => {
       expect(global.fetch).toHaveBeenCalled();
       // Find the final status report (skip SENT)
       const calls = vi.mocked(global.fetch).mock.calls;
-      const lastBody = JSON.parse((calls[calls.length - 1][1] as any).body);
+      const lastBody = JSON.parse((calls[calls.length - 1][1] as RequestInit).body);
       expect(lastBody.status).toBe("FAILED");
     });
 
@@ -383,7 +383,7 @@ describe("StatusTracker", () => {
 
       expect(global.fetch).toHaveBeenCalled();
       const calls = vi.mocked(global.fetch).mock.calls;
-      const lastBody = JSON.parse((calls[calls.length - 1][1] as any).body);
+      const lastBody = JSON.parse((calls[calls.length - 1][1] as RequestInit).body);
       expect(lastBody.status).toBe("FAILED");
       expect(lastBody.errorMessage).toContain("not found in Messages.app");
     });
@@ -412,7 +412,7 @@ describe("StatusTracker", () => {
 
       expect(global.fetch).toHaveBeenCalledTimes(1);
       const body = JSON.parse(
-        (vi.mocked(global.fetch).mock.calls[0][1] as any).body,
+        (vi.mocked(global.fetch).mock.calls[0][1] as RequestInit).body,
       );
       expect(body.status).toBe("SENT");
     });

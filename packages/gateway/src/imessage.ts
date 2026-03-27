@@ -86,10 +86,10 @@ export function isChatDbAvailable(): boolean {
  * Check if chat.db is actually readable (Full Disk Access granted).
  * The file can exist but be unreadable without FDA.
  */
-export function isChatDbReadable(): boolean {
+export async function isChatDbReadable(): Promise<boolean> {
   if (!isChatDbAvailable()) return false;
   try {
-    const { openSync, closeSync, constants } = require("node:fs");
+    const { openSync, closeSync, constants } = await import("node:fs");
     const fd = openSync(getChatDbPath(), constants.O_RDONLY);
     closeSync(fd);
     return true;

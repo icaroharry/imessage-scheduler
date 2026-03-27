@@ -1,5 +1,4 @@
 import { describe, it, expect, beforeEach } from "vitest";
-import { Hono } from "hono";
 import Database from "better-sqlite3";
 import { drizzle } from "drizzle-orm/better-sqlite3";
 import * as schema from "../src/db/schema.js";
@@ -549,7 +548,7 @@ describe("Messages API", () => {
         return (await res.json()).data;
       };
 
-      const msg1 = await createMsg("Message 1");
+      await createMsg("Message 1");
       const msg2 = await createMsg("Message 2");
       const msg3 = await createMsg("Message 3");
 

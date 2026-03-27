@@ -1,4 +1,4 @@
-import { eq, asc, lte, or, isNull } from "drizzle-orm";
+import { eq, asc } from "drizzle-orm";
 import { messages, config } from "../db/schema.js";
 import type { AppDatabase } from "../db/index.js";
 import { emit } from "../events.js";
@@ -82,10 +82,8 @@ export class MessageScheduler {
 
       // Try to send via gateway
       try {
-        let sent = false;
-
         if (this.onSend) {
-          sent = await this.onSend({
+          await this.onSend({
             id: next.id,
             phone: next.phone,
             body: next.body,
@@ -107,8 +105,6 @@ export class MessageScheduler {
             const err = await response.text();
             throw new Error(`Gateway error: ${response.status} ${err}`);
           }
-
-          sent = true;
         }
 
         // The gateway reports final status (SENT/DELIVERED/FAILED) back via

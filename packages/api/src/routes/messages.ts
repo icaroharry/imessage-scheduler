@@ -1,6 +1,6 @@
 import { Hono } from "hono";
 import { z } from "zod";
-import { eq, desc, sql, count } from "drizzle-orm";
+import { eq, desc, count } from "drizzle-orm";
 import { messages } from "../db/schema.js";
 import type { AppDatabase } from "../db/index.js";
 import { emit } from "../events.js";
