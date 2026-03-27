@@ -160,7 +160,7 @@ pnpm test:e2e:browser:ui
 ## Dev Tools Used
 
 - **Claude Code** (Opus 4.6) + **Codex** (GPT 5.4) — AI-assisted development and code generation
-- **T3 Code** — Full-stack project scaffolding and best practices
+- **T3 Code** — Agent tool for managing multiple parallel AI agents
 - **Next.js DevTools MCP** and best practices — Development tooling and framework conventions
 - **Stryker** — Mutation testing for code quality assurance
 - **Frontend Design Skills** — UI/UX design and implementation
