@@ -1,0 +1,26 @@
+{
+  "name": "@imessage-scheduler/e2e",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test": "playwright test",
+    "test:ui": "playwright test --ui",
+    "test:api": "playwright test --project=api",
+    "test:browser": "playwright test --project=browser",
+    "test:browser:headed": "playwright test --project=browser --headed",
+    "test:browser:ui": "playwright test --project=browser --ui"
+  },
+  "dependencies": {
+    "@playwright/test": "^1.52.0",
+    "hono": "^4.7.4",
+    "@hono/node-server": "^1.14.1",
+    "better-sqlite3": "^11.8.1",
+    "drizzle-orm": "^0.39.3",
+    "tsx": "^4.19.3"
+  },
+  "devDependencies": {
+    "@types/better-sqlite3": "^7.6.13",
+    "@types/node": "^22.13.14"
+  }
+}

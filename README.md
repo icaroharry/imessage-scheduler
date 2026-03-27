@@ -91,7 +91,7 @@ Environment variables:
 ## Running Tests
 
 ```bash
-# Run all tests
+# Run all unit tests
 pnpm test
 
 # Run only API tests
@@ -101,10 +101,41 @@ pnpm --filter @imessage-scheduler/api test
 pnpm --filter @imessage-scheduler/gateway test
 ```
 
+### E2E Tests (Playwright)
+
+End-to-end tests live in the `e2e/` folder and cover two areas:
+
+- **API delivery tracking** — verifies the full message lifecycle (create → schedule → gateway extraction → delivered) for short and long messages, including the multi-byte `attributedBody` length encoding path.
+- **Browser tests** — exercises the web UI end-to-end: creating messages, validation, status progression, settings, and navigation.
+
+The e2e suite spins up an isolated API server (in-memory SQLite, port 3051) and a mock gateway (port 3052) automatically. Browser tests require the Next.js dev server running on port 3000.
+
+```bash
+# Run all e2e tests (API + browser, headless)
+pnpm test:e2e
+
+# Run only API delivery tracking tests
+pnpm test:e2e:api
+
+# Run only browser tests (headless)
+pnpm test:e2e:browser
+
+# Run browser tests with visible Chrome
+pnpm test:e2e:browser:headed
+
+# Open Playwright interactive UI (all tests)
+pnpm test:e2e:ui
+
+# Open Playwright interactive UI (browser tests only)
+pnpm test:e2e:browser:ui
+```
+
+> **Note:** Browser tests need `pnpm dev` running in another terminal. API calls from the web app are intercepted and redirected to the isolated e2e API server via Playwright route fixtures.
+
 ## Tech Stack
 
 - **Frontend**: Next.js 16, React 19, Tailwind CSS 4, shadcn/ui
 - **Backend**: Hono, better-sqlite3, Drizzle ORM, Zod
 - **Gateway**: Hono, osascript (AppleScript)
-- **Testing**: Vitest (in-memory SQLite for API tests, mocked osascript for gateway)
+- **Testing**: Vitest (unit tests), Playwright (e2e — API + browser)
 - **Monorepo**: pnpm workspaces

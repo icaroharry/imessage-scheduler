@@ -5,6 +5,12 @@
     "dev": "concurrently -n api,gateway,web -c blue,green,magenta \"pnpm --filter @imessage-scheduler/api dev\" \"pnpm --filter @imessage-scheduler/gateway dev\" \"pnpm --filter @imessage-scheduler/web dev\"",
     "build": "pnpm -r build",
     "test": "pnpm -r test",
+    "test:e2e": "pnpm --filter @imessage-scheduler/e2e test",
+    "test:e2e:ui": "pnpm --filter @imessage-scheduler/e2e test:ui",
+    "test:e2e:api": "pnpm --filter @imessage-scheduler/e2e test:api",
+    "test:e2e:browser": "pnpm --filter @imessage-scheduler/e2e test:browser",
+    "test:e2e:browser:headed": "pnpm --filter @imessage-scheduler/e2e test:browser:headed",
+    "test:e2e:browser:ui": "pnpm --filter @imessage-scheduler/e2e test:browser:ui",
     "lint": "pnpm -r lint"
   },
   "devDependencies": {
