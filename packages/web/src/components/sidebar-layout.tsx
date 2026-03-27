@@ -14,6 +14,7 @@ import {
 } from "@/components/ui/breadcrumb"
 import { Button } from "@/components/ui/button"
 import { NewMessageDialog } from "@/components/new-message-dialog"
+import { SSEProvider } from "@/components/sse-provider"
 import { usePathname } from "next/navigation"
 import { Plus } from "lucide-react"
 import { SPRING_BOUNCY } from "@/components/motion-primitives"
@@ -52,6 +53,7 @@ export function SidebarLayout({ children }: { children: React.ReactNode }) {
 
   return (
     <NewMessageContext value={{ open: dialogOpen, setOpen: setDialogOpen, refreshKey }}>
+      <SSEProvider>
       <TooltipProvider>
         <SidebarProvider>
           <AppSidebar />
@@ -100,6 +102,7 @@ export function SidebarLayout({ children }: { children: React.ReactNode }) {
           />
         </SidebarProvider>
       </TooltipProvider>
+      </SSEProvider>
     </NewMessageContext>
   )
 }

@@ -24,7 +24,7 @@ import {
   Activity,
   Clock,
 } from "lucide-react"
-import { useEffect, useState } from "react"
+import { useSSEData } from "@/components/sse-provider"
 
 const navItems = [
   {
@@ -48,23 +48,7 @@ const navItems = [
 ]
 
 function GatewayStatus() {
-  const [status, setStatus] = useState<"checking" | "online" | "offline">(
-    "checking"
-  )
-
-  useEffect(() => {
-    const check = async () => {
-      try {
-        const res = await fetch("http://localhost:3002/health")
-        setStatus(res.ok ? "online" : "offline")
-      } catch {
-        setStatus("offline")
-      }
-    }
-    check()
-    const interval = setInterval(check, 15000)
-    return () => clearInterval(interval)
-  }, [])
+  const { gatewayStatus: status } = useSSEData()
 
   return (
     <div className="px-2 py-2">

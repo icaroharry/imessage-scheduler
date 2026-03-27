@@ -129,6 +129,25 @@ class ApiClient {
   async healthCheck(): Promise<{ status: string; timestamp: string }> {
     return this.request("/health");
   }
+
+  // Gateway health (proxied through API)
+  async getGatewayHealth(): Promise<{
+    status: string;
+    timestamp?: string;
+    system?: {
+      platform: string;
+      isMacOS: boolean;
+      chatDbAvailable: boolean;
+      chatDbReadable: boolean;
+    };
+  }> {
+    return this.request("/gateway/health");
+  }
+
+  // Open Full Disk Access settings (proxied through API)
+  async openFDASettings(): Promise<{ success: boolean; message: string }> {
+    return this.request("/gateway/open-fda-settings", { method: "POST" });
+  }
 }
 
 export const api = new ApiClient();

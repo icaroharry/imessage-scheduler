@@ -33,7 +33,7 @@ const webServers: Array<{
 
 if (startNextServer) {
   webServers.push({
-    command: "npx next start ../packages/web -p 3000",
+    command: "npx next start ../packages/web",
     port: 3000,
     reuseExistingServer: false,
     stdout: "pipe",
