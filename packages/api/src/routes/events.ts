@@ -1,6 +1,6 @@
 import { Hono } from "hono";
 import { streamSSE } from "hono/streaming";
-import { addClient, removeClient, getClientCount } from "../events.js";
+import { addClient, removeClient, getClientCount, getLastGatewayStatus } from "../events.js";
 
 export const eventsRouter = new Hono()
   .get("/", (c) => {
@@ -15,6 +15,15 @@ export const eventsRouter = new Hono()
           clients: getClientCount(),
         }),
       });
+
+      // Send current gateway status so the client doesn't stay on "Checking..."
+      const gwStatus = getLastGatewayStatus();
+      if (gwStatus) {
+        await stream.writeSSE({
+          event: "gateway:status",
+          data: JSON.stringify({ status: gwStatus }),
+        });
+      }
 
       // Heartbeat every 30s to keep the connection alive through proxies
       const heartbeat = setInterval(() => {

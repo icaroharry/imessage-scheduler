@@ -37,9 +37,23 @@ export function getClientCount(): number {
   return clients.size;
 }
 
+// ── Gateway status cache ────────────────────────────────────────────────
+// Tracks the last known gateway status so new SSE clients can receive it
+// immediately on connect, rather than waiting for the next health poll.
+
+let cachedGatewayStatus: "online" | "offline" | null = null;
+
+export function getLastGatewayStatus(): "online" | "offline" | null {
+  return cachedGatewayStatus;
+}
+
 // ── Broadcast ───────────────────────────────────────────────────────────
 
 export function emit(event: SSEEvent): void {
+  // Cache gateway status for new clients
+  if (event.type === "gateway:status") {
+    cachedGatewayStatus = event.data.status;
+  }
   const payload = JSON.stringify(event.data);
   const dead: SSEStreamingApi[] = [];
 
