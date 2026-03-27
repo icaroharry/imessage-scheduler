@@ -4,6 +4,7 @@ import { useEffect, useState, useCallback } from "react";
 import { MessageCard } from "./message-card";
 import { api } from "@/lib/api";
 import type { Message } from "@/lib/api";
+import { Button } from "@/components/ui/button";
 import { Loader2 } from "lucide-react";
 
 interface MessageListProps {
@@ -59,12 +60,13 @@ export function MessageList({ refreshTrigger }: MessageListProps) {
     return (
       <div className="text-center py-12">
         <p className="text-sm text-destructive mb-2">{error}</p>
-        <button
+        <Button
+          variant="link"
+          size="sm"
           onClick={fetchMessages}
-          className="text-sm text-primary hover:underline"
         >
           Try again
-        </button>
+        </Button>
       </div>
     );
   }
@@ -73,7 +75,9 @@ export function MessageList({ refreshTrigger }: MessageListProps) {
     return (
       <div className="text-center py-12 text-muted-foreground">
         <p className="text-sm">No messages yet.</p>
-        <p className="text-xs mt-1">Schedule your first message above!</p>
+        <p className="text-xs mt-1">
+          Click <strong>New Message</strong> to schedule your first message.
+        </p>
       </div>
     );
   }

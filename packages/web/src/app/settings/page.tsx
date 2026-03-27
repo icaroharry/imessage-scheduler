@@ -3,6 +3,7 @@
 import { useEffect, useState, useTransition } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
@@ -182,9 +183,7 @@ export default function SettingsPage() {
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="space-y-2">
-            <label className="text-sm font-medium">
-              Send Interval
-            </label>
+            <Label>Send Interval</Label>
             <p className="text-xs text-muted-foreground">
               How often the scheduler picks up the next queued message.
               Currently: <strong>{formatInterval(config.sendIntervalMs)}</strong>
@@ -221,9 +220,7 @@ export default function SettingsPage() {
           <Separator />
 
           <div className="space-y-2">
-            <label className="text-sm font-medium">
-              Gateway URL
-            </label>
+            <Label>Gateway URL</Label>
             <p className="text-xs text-muted-foreground">
               The URL of the iMessage gateway service.
             </p>
