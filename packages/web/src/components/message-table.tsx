@@ -16,9 +16,9 @@ import type { MessageStatus } from "@/lib/api";
 import { useSSEData } from "@/components/sse-provider";
 import { Loader2 } from "lucide-react";
 
-const statusDisplay: Record<MessageStatus, { label: string; className: string; spinning?: boolean }> = {
+const statusDisplay: Record<MessageStatus, { label: string; className: string }> = {
   QUEUED: { label: "Queued", className: "bg-secondary text-secondary-foreground" },
-  ACCEPTED: { label: "Processing", className: "bg-amber-100 text-amber-700", spinning: true },
+  ACCEPTED: { label: "Accepted", className: "bg-amber-100 text-amber-700" },
   SENT: { label: "Sent", className: "bg-accent text-accent-foreground" },
   DELIVERED: { label: "Delivered", className: "bg-emerald-100 text-emerald-700" },
   FAILED: { label: "Failed", className: "bg-destructive/10 text-destructive" },
@@ -27,7 +27,7 @@ const statusDisplay: Record<MessageStatus, { label: string; className: string; s
 const statusFilters: { label: string; value: MessageStatus | "ALL" }[] = [
   { label: "All", value: "ALL" },
   { label: "Queued", value: "QUEUED" },
-  { label: "Processing", value: "ACCEPTED" },
+  { label: "Accepted", value: "ACCEPTED" },
   { label: "Sent", value: "SENT" },
   { label: "Delivered", value: "DELIVERED" },
   { label: "Failed", value: "FAILED" },
@@ -128,9 +128,6 @@ export function MessageTable() {
                       <Badge
                         className={`text-xs ${statusDisplay[msg.status].className}`}
                       >
-                        {statusDisplay[msg.status].spinning && (
-                          <Loader2 className="h-3 w-3 animate-spin mr-1" />
-                        )}
                         {statusDisplay[msg.status].label}
                       </Badge>
                     </TableCell>
