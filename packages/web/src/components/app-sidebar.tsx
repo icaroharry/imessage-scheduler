@@ -45,7 +45,7 @@ function GatewayStatus() {
   const { gatewayStatus: status } = useSSEData()
 
   return (
-    <div className="px-2 py-2">
+    <div className="px-2 py-2 group-data-[collapsible=icon]:hidden">
       <div className="rounded-lg border bg-card p-3 text-card-foreground shadow-sm">
         <div className="flex items-center gap-2 text-xs font-medium text-muted-foreground mb-2">
           <MessageSquare className="h-3 w-3" />
