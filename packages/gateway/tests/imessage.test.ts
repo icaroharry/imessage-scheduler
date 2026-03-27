@@ -59,11 +59,14 @@ describe("iMessage Module", () => {
       expect(mockedExecFile).toHaveBeenCalled();
       const call = mockedExecFile.mock.calls[0];
       expect(call[0]).toBe("osascript");
-      // Args array contains ["-e", <script>]
-      expect(call[1]).toEqual(expect.arrayContaining(["-e"]));
+      // Args array: ["-e", <script>, phone, body]
+      const args = call[1] as string[];
+      expect(args[0]).toBe("-e");
+      expect(args[1]).toContain("on run argv");
+      expect(args[1]).toContain("tell application");
     });
 
-    it("should escape quotes in message body", async () => {
+    it("should pass phone and body as osascript argv (no string interpolation)", async () => {
       Object.defineProperty(process, "platform", { value: "darwin" });
 
       const mockedExecFile = vi.mocked(execFile);
@@ -76,15 +79,36 @@ describe("iMessage Module", () => {
 
       const { sendIMessage } = await import("../src/imessage.js");
 
-      await sendIMessage("+15551234567", 'Hello "world"');
+      const phone = "+15551234567";
+      const body = 'Hello "world" with emoji 🎉 and\nnewlines';
+      await sendIMessage(phone, body);
 
       const callArgs = mockedExecFile.mock.calls[0];
-      // The script is passed as the second element of the args array (after "-e")
       const args = callArgs[1] as string[];
-      const script = args.find((a) => a.includes("tell application"));
-      expect(script).toBeDefined();
-      // The inner double quotes should be escaped
-      expect(script).toContain('\\"world\\"');
+      // Phone and body are passed as separate argv elements — NOT interpolated into the script
+      expect(args[2]).toBe(phone);
+      expect(args[3]).toBe(body);
+      // The script itself should NOT contain the phone or body text
+      expect(args[1]).not.toContain(phone);
+      expect(args[1]).not.toContain("Hello");
+    });
+
+    it("should return structured errorCode on failure", async () => {
+      Object.defineProperty(process, "platform", { value: "darwin" });
+
+      const mockedExecFile = vi.mocked(execFile);
+      mockedExecFile.mockImplementation(
+        (_cmd: string, _args: any, _opts: any, callback: any) => {
+          if (callback) callback(new Error("execution error: Can't get buddy \"+15550000000\" (-1728)"));
+          return {} as any;
+        },
+      );
+
+      const { sendIMessage } = await import("../src/imessage.js");
+
+      const result = await sendIMessage("+15550000000", "Test");
+      expect(result.success).toBe(false);
+      expect(result.errorCode).toBe("BUDDY_NOT_FOUND");
     });
   });
 });

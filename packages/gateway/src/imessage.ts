@@ -3,59 +3,79 @@ import { promisify } from "node:util";
 import { existsSync } from "node:fs";
 import { homedir } from "node:os";
 import path from "node:path";
+import { classifyError, type SendErrorCode } from "./errors.js";
 
 const execFileAsync = promisify(execFile);
 
 export interface SendResult {
   success: boolean;
   error?: string;
+  /** Structured error code for programmatic handling */
+  errorCode?: SendErrorCode;
 }
+
+/**
+ * AppleScript that receives phone and body via `on run argv` instead of
+ * string interpolation. This eliminates all escaping issues — emoji,
+ * newlines, quotes, backslashes, and unicode all work correctly because
+ * osascript passes them as native AppleScript string values.
+ */
+const SEND_SCRIPT = `
+on run argv
+  set targetPhone to item 1 of argv
+  set messageBody to item 2 of argv
+
+  tell application "Messages"
+    -- Verify at least one iMessage account is signed in
+    set iMsgAccounts to every account whose service type = iMessage
+    if (count of iMsgAccounts) is 0 then
+      error "NO_IMESSAGE_ACCOUNT: No iMessage account is signed in on this Mac"
+    end if
+    set targetService to item 1 of iMsgAccounts
+
+    -- Send the message. Messages.app resolves (or creates) the buddy.
+    try
+      send messageBody to buddy targetPhone of targetService
+    on error errMsg number errNum
+      error "SEND_FAILED (" & errNum & "): " & errMsg
+    end try
+  end tell
+end run
+`;
 
 /**
  * Send an iMessage via AppleScript / osascript.
  *
- * This uses the Messages.app on macOS to send an iMessage.
- * The Mac must be signed into an iMessage account.
+ * Uses `on run argv` to pass phone & body as proper arguments rather than
+ * interpolating them into the script source. This avoids all escaping issues
+ * with quotes, backslashes, emoji, newlines, and unicode.
+ *
+ * The Mac must be signed into an iMessage account in Messages.app.
  */
 export async function sendIMessage(
   phone: string,
   body: string,
 ): Promise<SendResult> {
-  // Validate we're on macOS
   if (process.platform !== "darwin") {
-    return {
-      success: false,
-      error: "iMessage sending is only supported on macOS",
-    };
+    return { success: false, error: "iMessage sending is only supported on macOS", errorCode: "NOT_MACOS" };
   }
 
-  // Escape single quotes in the message body and phone number
-  const escapedBody = body.replace(/\\/g, "\\\\").replace(/"/g, '\\"');
-  const escapedPhone = phone.replace(/"/g, '\\"');
-
-  const script = `
-    tell application "Messages"
-      set targetService to 1st account whose service type = iMessage
-      set targetBuddy to participant "${escapedPhone}" of targetService
-      send "${escapedBody}" to targetBuddy
-    end tell
-  `;
-
   try {
-    await execFileAsync("osascript", ["-e", script], {
-      timeout: 15000,
+    // Phone and body are passed as positional args — osascript delivers them
+    // to `on run argv` as a list. No escaping or interpolation needed.
+    await execFileAsync("osascript", ["-e", SEND_SCRIPT, phone, body], {
+      timeout: 30_000, // 30s — Messages.app may need time to launch on first send
     });
     return { success: true };
   } catch (error) {
-    const errorMsg =
-      error instanceof Error ? error.message : "Unknown osascript error";
-    return { success: false, error: errorMsg };
+    const raw = error instanceof Error ? error.message : "Unknown osascript error";
+    const classified = classifyError(raw);
+    return { success: false, error: classified.message, errorCode: classified.code };
   }
 }
 
 /**
- * Check if the Messages.app chat database exists.
- * This is used to verify the Mac is set up for iMessage.
+ * Check if the Messages.app chat database file exists on disk.
  */
 export function isChatDbAvailable(): boolean {
   const chatDbPath = path.join(homedir(), "Library", "Messages", "chat.db");
@@ -63,8 +83,39 @@ export function isChatDbAvailable(): boolean {
 }
 
 /**
+ * Check if chat.db is actually readable (Full Disk Access granted).
+ * The file can exist but be unreadable without FDA.
+ */
+export function isChatDbReadable(): boolean {
+  if (!isChatDbAvailable()) return false;
+  try {
+    const { openSync, closeSync, constants } = require("node:fs");
+    const fd = openSync(getChatDbPath(), constants.O_RDONLY);
+    closeSync(fd);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+/**
  * Get the path to the Messages.app chat database.
  */
 export function getChatDbPath(): string {
   return path.join(homedir(), "Library", "Messages", "chat.db");
+}
+
+/**
+ * Open the macOS System Settings to the Full Disk Access pane.
+ */
+export async function openFullDiskAccessSettings(): Promise<boolean> {
+  if (process.platform !== "darwin") return false;
+  try {
+    await execFileAsync("open", [
+      "x-apple.systempreferences:com.apple.preference.security?Privacy_AllFiles",
+    ]);
+    return true;
+  } catch {
+    return false;
+  }
 }
