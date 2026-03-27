@@ -105,17 +105,10 @@ export class MessageScheduler {
           sent = true;
         }
 
-        if (sent) {
-          this.db
-            .update(messages)
-            .set({
-              status: "SENT",
-              sentAt: new Date().toISOString(),
-              updatedAt: new Date().toISOString(),
-            })
-            .where(eq(messages.id, next.id))
-            .run();
-        }
+        // The gateway reports final status (SENT/DELIVERED/FAILED) back via
+        // the StatusTracker PATCH endpoint. We don't update status here to
+        // avoid a race condition where the scheduler overwrites the gateway's
+        // already-reported status.
 
         return true;
       } catch (error) {

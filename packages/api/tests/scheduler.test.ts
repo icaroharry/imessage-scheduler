@@ -112,7 +112,7 @@ describe("MessageScheduler", () => {
   });
 
   describe("processNext", () => {
-    it("should process and mark message as SENT on success", async () => {
+    it("should process and leave message as ACCEPTED on success (gateway reports final status)", async () => {
       const msg = seedMessage(db, { body: "To be sent" });
 
       const onSend = vi.fn().mockResolvedValue(true);
@@ -127,15 +127,14 @@ describe("MessageScheduler", () => {
         body: "To be sent",
       });
 
-      // Check message status in DB
+      // Status stays at ACCEPTED — the gateway reports SENT/DELIVERED via PATCH
       const updated = db
         .select()
         .from(schema.messages)
         .where(eq(schema.messages.id, msg.id))
         .get();
 
-      expect(updated!.status).toBe("SENT");
-      expect(updated!.sentAt).toBeDefined();
+      expect(updated!.status).toBe("ACCEPTED");
     });
 
     it("should mark message as FAILED on send error", async () => {
@@ -183,7 +182,7 @@ describe("MessageScheduler", () => {
       expect(sentBodies).toEqual(["First", "Second"]);
     });
 
-    it("should transition through QUEUED → ACCEPTED → SENT", async () => {
+    it("should transition QUEUED → ACCEPTED during processing", async () => {
       const msg = seedMessage(db);
       const statuses: string[] = [];
 
@@ -204,13 +203,14 @@ describe("MessageScheduler", () => {
       // During send, status was ACCEPTED
       expect(statuses[0]).toBe("ACCEPTED");
 
-      // After send, status is SENT
+      // After processNext completes, status remains ACCEPTED
+      // (gateway is responsible for updating to SENT/DELIVERED)
       const final = db
         .select()
         .from(schema.messages)
         .where(eq(schema.messages.id, msg.id))
         .get();
-      expect(final!.status).toBe("SENT");
+      expect(final!.status).toBe("ACCEPTED");
     });
 
     it("should not process concurrently", async () => {
