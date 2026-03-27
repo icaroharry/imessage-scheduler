@@ -167,13 +167,13 @@ describe("MessageList", () => {
       render(<MessageList />);
 
       await waitFor(() => {
-        expect(screen.getByText("(2)")).toBeInTheDocument(); // Queue count
         expect(screen.getByText("+15550001111")).toBeInTheDocument();
+        expect(screen.getByText("+15550003333")).toBeInTheDocument();
         expect(screen.getByText("+15550002222")).toBeInTheDocument();
       });
     });
 
-    it("displays correct queue count in header", async () => {
+    it("shows queue header without count", async () => {
       mockApi.getMessages.mockResolvedValue({
         data: [
           createMessage({ id: 1, status: "QUEUED" }),
@@ -186,8 +186,10 @@ describe("MessageList", () => {
       render(<MessageList />);
 
       await waitFor(() => {
-        expect(screen.getByText("(2)")).toBeInTheDocument();
+        expect(screen.getByText("Queue")).toBeInTheDocument();
       });
+
+      expect(screen.queryByText("(2)")).not.toBeInTheDocument();
     });
   });
 
@@ -339,6 +341,38 @@ describe("MessageList", () => {
     await waitFor(() => {
       expect(mockApi.deleteMessage).toHaveBeenCalledWith(1);
       expect(screen.queryByText("+15550001111")).not.toBeInTheDocument();
+    });
+  });
+
+  it("re-fetches and shows a friendly notice when delete hits a stale QUEUED conflict", async () => {
+    const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
+    mockApi.getMessages
+      .mockResolvedValueOnce({
+        data: [createMessage({ id: 1, status: "QUEUED", phone: "+15550001111" })],
+        pagination: { total: 1, limit: 50, offset: 0 },
+      })
+      .mockResolvedValueOnce({
+        data: [createMessage({ id: 1, status: "ACCEPTED", phone: "+15550001111" })],
+        pagination: { total: 1, limit: 50, offset: 0 },
+      });
+    mockApi.deleteMessage.mockRejectedValue(
+      new Error("Can only delete messages with QUEUED status")
+    );
+
+    render(<MessageList />);
+
+    await waitFor(() => {
+      expect(screen.getByText("+15550001111")).toBeInTheDocument();
+    });
+
+    await user.click(screen.getByRole("button"));
+
+    await waitFor(() => {
+      expect(mockApi.deleteMessage).toHaveBeenCalledWith(1);
+      expect(mockApi.getMessages).toHaveBeenCalledTimes(2);
+      expect(
+        screen.getByText("Message is already being processed.")
+      ).toBeInTheDocument();
     });
   });
 
