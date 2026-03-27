@@ -99,6 +99,21 @@ export const bannerVariants: Variants = {
   },
 };
 
+// ── Chart card stagger variants ──────────────────────────────────────────────
+export const chartContainerVariants: Variants = {
+  hidden: {},
+  show: {
+    transition: {
+      staggerChildren: 0.08,
+    },
+  },
+};
+
+export const chartCardVariants: Variants = {
+  hidden: { opacity: 0, y: 20 },
+  show: { opacity: 1, y: 0, transition: SPRING_GENTLE },
+};
+
 export const shakeVariants: Variants = {
   hidden: { opacity: 0, height: 0, marginTop: 0 },
   show: {

@@ -49,17 +49,22 @@ function truncate(str: string, maxLen: number): string {
   return str.slice(0, maxLen) + "...";
 }
 
-export function MessageTable() {
+interface MessageTableProps {
+  compact?: boolean;
+  maxRows?: number;
+}
+
+export function MessageTable({ compact = false, maxRows }: MessageTableProps = {}) {
   const { messages, connected } = useSSEData();
   const [filter, setFilter] = useState<MessageStatus | "ALL">("ALL");
 
-  const filtered = useMemo(
-    () =>
+  const filtered = useMemo(() => {
+    const base =
       filter === "ALL"
         ? messages
-        : messages.filter((m) => m.status === filter),
-    [messages, filter],
-  );
+        : messages.filter((m) => m.status === filter);
+    return maxRows ? base.slice(0, maxRows) : base;
+  }, [messages, filter, maxRows]);
 
   const loading = !connected && messages.length === 0;
 
@@ -100,21 +105,23 @@ export function MessageTable() {
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead className="w-16">ID</TableHead>
+                  {!compact && <TableHead className="w-16">ID</TableHead>}
                   <TableHead>Phone</TableHead>
                   <TableHead className="min-w-[200px]">Message</TableHead>
                   <TableHead>Status</TableHead>
                   <TableHead>Created</TableHead>
                   <TableHead>Sent</TableHead>
-                  <TableHead>Error</TableHead>
+                  {!compact && <TableHead>Error</TableHead>}
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {filtered.map((msg) => (
                   <TableRow key={msg.id}>
-                    <TableCell className="font-mono text-xs text-muted-foreground">
-                      #{msg.id}
-                    </TableCell>
+                    {!compact && (
+                      <TableCell className="font-mono text-xs text-muted-foreground">
+                        #{msg.id}
+                      </TableCell>
+                    )}
                     <TableCell className="font-medium text-sm">
                       {msg.phone}
                     </TableCell>
@@ -140,11 +147,13 @@ export function MessageTable() {
                     <TableCell className="text-xs text-muted-foreground">
                       {formatDate(msg.sentAt)}
                     </TableCell>
-                    <TableCell className="text-xs text-destructive max-w-[200px]">
-                      {msg.errorMessage
-                        ? truncate(msg.errorMessage, 40)
-                        : "-"}
-                    </TableCell>
+                    {!compact && (
+                      <TableCell className="text-xs text-destructive max-w-[200px]">
+                        {msg.errorMessage
+                          ? truncate(msg.errorMessage, 40)
+                          : "-"}
+                      </TableCell>
+                    )}
                   </TableRow>
                 ))}
               </TableBody>
