@@ -1,5 +1,6 @@
 "use client"
 
+import { createContext, useContext, useState, useCallback } from "react"
 import { AppSidebar } from "@/components/app-sidebar"
 import { SidebarInset, SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar"
 import { TooltipProvider } from "@/components/ui/tooltip"
@@ -10,46 +11,88 @@ import {
   BreadcrumbList,
   BreadcrumbPage,
 } from "@/components/ui/breadcrumb"
+import { Button } from "@/components/ui/button"
+import { NewMessageDialog } from "@/components/new-message-dialog"
 import { usePathname } from "next/navigation"
+import { Plus } from "lucide-react"
 
 const pageTitles: Record<string, string> = {
-  "/": "Schedule Message",
+  "/": "Messages",
   "/dashboard": "Dashboard",
   "/settings": "Settings",
+}
+
+interface NewMessageContextValue {
+  open: boolean
+  setOpen: (open: boolean) => void
+  refreshKey: number
+}
+
+const NewMessageContext = createContext<NewMessageContextValue>({
+  open: false,
+  setOpen: () => {},
+  refreshKey: 0,
+})
+
+export function useNewMessage() {
+  return useContext(NewMessageContext)
 }
 
 export function SidebarLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname()
   const pageTitle = pageTitles[pathname] || "iScheduler"
+  const [dialogOpen, setDialogOpen] = useState(false)
+  const [refreshKey, setRefreshKey] = useState(0)
+
+  const handleMessageCreated = useCallback(() => {
+    setRefreshKey((prev) => prev + 1)
+  }, [])
 
   return (
-    <TooltipProvider>
-      <SidebarProvider>
-        <AppSidebar />
-        <SidebarInset>
-          <header className="flex h-14 shrink-0 items-center gap-2 border-b transition-[width,height] ease-linear group-has-data-[collapsible=icon]/sidebar-wrapper:h-12">
-            <div className="flex items-center gap-2 px-4">
-              <SidebarTrigger className="-ml-1" />
-              <Separator
-                orientation="vertical"
-                className="mr-2 data-vertical:h-4 data-vertical:self-auto"
-              />
-              <Breadcrumb>
-                <BreadcrumbList>
-                  <BreadcrumbItem>
-                    <BreadcrumbPage className="font-medium">
-                      {pageTitle}
-                    </BreadcrumbPage>
-                  </BreadcrumbItem>
-                </BreadcrumbList>
-              </Breadcrumb>
+    <NewMessageContext value={{ open: dialogOpen, setOpen: setDialogOpen, refreshKey }}>
+      <TooltipProvider>
+        <SidebarProvider>
+          <AppSidebar />
+          <SidebarInset>
+            <header className="flex h-14 shrink-0 items-center justify-between border-b transition-[width,height] ease-linear group-has-data-[collapsible=icon]/sidebar-wrapper:h-12">
+              <div className="flex items-center gap-2 px-4">
+                <SidebarTrigger className="-ml-1" />
+                <Separator
+                  orientation="vertical"
+                  className="mr-2 data-vertical:h-4 data-vertical:self-auto"
+                />
+                <Breadcrumb>
+                  <BreadcrumbList>
+                    <BreadcrumbItem>
+                      <BreadcrumbPage className="font-medium">
+                        {pageTitle}
+                      </BreadcrumbPage>
+                    </BreadcrumbItem>
+                  </BreadcrumbList>
+                </Breadcrumb>
+              </div>
+              <div className="px-4">
+                <Button
+                  size="sm"
+                  onClick={() => setDialogOpen(true)}
+                >
+                  <Plus className="h-4 w-4 mr-1.5" />
+                  <span className="hidden sm:inline">New Message</span>
+                  <span className="sm:hidden">New</span>
+                </Button>
+              </div>
+            </header>
+            <div className="flex-1">
+              {children}
             </div>
-          </header>
-          <div className="flex-1">
-            {children}
-          </div>
-        </SidebarInset>
-      </SidebarProvider>
-    </TooltipProvider>
+          </SidebarInset>
+          <NewMessageDialog
+            open={dialogOpen}
+            onOpenChange={setDialogOpen}
+            onMessageCreated={handleMessageCreated}
+          />
+        </SidebarProvider>
+      </TooltipProvider>
+    </NewMessageContext>
   )
 }
