@@ -26,8 +26,8 @@ test.describe("Settings page", () => {
     await expect(page).toHaveURL(/\/settings/);
     await expect(page.getByText(/Send Interval/)).toBeVisible();
 
-    // Navigate back to Schedule (home)
-    await page.getByRole("link", { name: "Schedule", exact: true }).click();
+    // Navigate back to Queue (home)
+    await page.getByRole("link", { name: "Queue", exact: true }).click();
     await expect(page).toHaveURL(/\/$/);
   });
 
