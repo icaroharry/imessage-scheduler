@@ -41,6 +41,14 @@ export function useSSE(): SSEData {
     } catch (err) {
       console.error("[SSE] Failed to fetch initial data:", err);
     }
+
+    // Gateway health is best-effort — don't block on it
+    try {
+      await api.getGatewayHealth();
+      setGatewayStatus("online");
+    } catch {
+      setGatewayStatus("offline");
+    }
   }, []);
 
   useEffect(() => {
