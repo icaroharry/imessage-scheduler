@@ -16,18 +16,18 @@ import { api } from "@/lib/api";
 import type { Message, MessageStatus } from "@/lib/api";
 import { Loader2, RefreshCw } from "lucide-react";
 
-const statusColors: Record<MessageStatus, string> = {
-  QUEUED: "bg-secondary text-secondary-foreground",
-  ACCEPTED: "bg-primary/10 text-primary",
-  SENT: "bg-accent text-accent-foreground",
-  DELIVERED: "bg-emerald-100 text-emerald-700",
-  FAILED: "bg-destructive/10 text-destructive",
+const statusDisplay: Record<MessageStatus, { label: string; className: string; spinning?: boolean }> = {
+  QUEUED: { label: "Queued", className: "bg-secondary text-secondary-foreground" },
+  ACCEPTED: { label: "Processing", className: "bg-amber-100 text-amber-700", spinning: true },
+  SENT: { label: "Sent", className: "bg-accent text-accent-foreground" },
+  DELIVERED: { label: "Delivered", className: "bg-emerald-100 text-emerald-700" },
+  FAILED: { label: "Failed", className: "bg-destructive/10 text-destructive" },
 };
 
 const statusFilters: { label: string; value: MessageStatus | "ALL" }[] = [
   { label: "All", value: "ALL" },
   { label: "Queued", value: "QUEUED" },
-  { label: "Accepted", value: "ACCEPTED" },
+  { label: "Processing", value: "ACCEPTED" },
   { label: "Sent", value: "SENT" },
   { label: "Delivered", value: "DELIVERED" },
   { label: "Failed", value: "FAILED" },
@@ -152,9 +152,12 @@ export function MessageTable() {
                     </TableCell>
                     <TableCell>
                       <Badge
-                        className={`text-xs ${statusColors[msg.status]}`}
+                        className={`text-xs ${statusDisplay[msg.status].className}`}
                       >
-                        {msg.status}
+                        {statusDisplay[msg.status].spinning && (
+                          <Loader2 className="h-3 w-3 animate-spin mr-1" />
+                        )}
+                        {statusDisplay[msg.status].label}
                       </Badge>
                     </TableCell>
                     <TableCell className="text-xs text-muted-foreground">

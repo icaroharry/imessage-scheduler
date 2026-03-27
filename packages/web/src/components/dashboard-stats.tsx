@@ -10,7 +10,7 @@ import {
   Send,
   XCircle,
   MessageSquare,
-  Zap,
+  Loader2,
 } from "lucide-react";
 
 const statCards = [
@@ -30,10 +30,11 @@ const statCards = [
   },
   {
     key: "accepted" as const,
-    label: "Accepted",
-    icon: Zap,
-    color: "text-accent-foreground",
-    bg: "bg-accent",
+    label: "Processing",
+    icon: Loader2,
+    color: "text-amber-600",
+    bg: "bg-amber-50",
+    spinning: true,
   },
   {
     key: "sent" as const,
@@ -94,6 +95,7 @@ export function DashboardStats() {
     <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
       {statCards.map((card) => {
         const Icon = card.icon;
+        const spinning = "spinning" in card && card.spinning;
         return (
           <Card key={card.key} className="transition-colors hover:bg-accent/30">
             <CardContent className="py-4 px-4">
@@ -101,7 +103,7 @@ export function DashboardStats() {
                 <div
                   className={`h-7 w-7 rounded-lg ${card.bg} flex items-center justify-center`}
                 >
-                  <Icon className={`h-4 w-4 ${card.color}`} />
+                  <Icon className={`h-4 w-4 ${card.color}${spinning ? " animate-spin" : ""}`} />
                 </div>
               </div>
               <div className="mt-2">

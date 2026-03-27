@@ -3,7 +3,7 @@
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Phone, Clock, Trash2, AlertCircle } from "lucide-react";
+import { Phone, Clock, Trash2, AlertCircle, Loader2 } from "lucide-react";
 import type { Message, MessageStatus } from "@/lib/api";
 
 interface MessageCardProps {
@@ -13,15 +13,16 @@ interface MessageCardProps {
 
 const statusConfig: Record<
   MessageStatus,
-  { label: string; className: string }
+  { label: string; className: string; spinning?: boolean }
 > = {
   QUEUED: {
     label: "Queued",
     className: "bg-secondary text-secondary-foreground",
   },
   ACCEPTED: {
-    label: "Accepted",
-    className: "bg-primary/10 text-primary",
+    label: "Processing",
+    className: "bg-amber-100 text-amber-700",
+    spinning: true,
   },
   SENT: {
     label: "Sent",
@@ -68,6 +69,9 @@ export function MessageCard({ message, onDelete }: MessageCardProps) {
                   variant="secondary"
                   className={`text-xs px-2 py-0 ${status.className}`}
                 >
+                  {status.spinning && (
+                    <Loader2 className="h-3 w-3 animate-spin mr-1" />
+                  )}
                   {status.label}
                 </Badge>
               </div>
