@@ -1,6 +1,6 @@
 import { Hono } from "hono";
 import { z } from "zod";
-import { eq, desc, sql, count } from "drizzle-orm";
+import { eq, desc, sql, count, inArray } from "drizzle-orm";
 import { messages } from "../db/schema.js";
 import type { AppDatabase } from "../db/index.js";
 import { emit } from "../events.js";
@@ -55,33 +55,42 @@ export function computeStats(db: AppDatabase): Stats {
 }
 
 export const messagesRouter = new Hono<Env>()
-  // List all messages with optional status filter
+  // List all messages with optional status filter (supports comma-separated statuses)
   .get("/", async (c) => {
     const db = c.get("db");
-    const status = c.req.query("status");
+    const statusParam = c.req.query("status");
     const limit = Number(c.req.query("limit")) || 50;
     const offset = Number(c.req.query("offset")) || 0;
 
-    let query = db.select().from(messages).orderBy(desc(messages.createdAt));
+    const statuses = statusParam
+      ? (statusParam.split(",") as (
+          | "QUEUED"
+          | "ACCEPTED"
+          | "SENT"
+          | "DELIVERED"
+          | "FAILED"
+        )[])
+      : undefined;
 
-    if (status) {
+    let query = db.select().from(messages).orderBy(desc(messages.createdAt));
+    let countQuery = db.select({ count: count() }).from(messages);
+
+    if (statuses && statuses.length === 1) {
+      query = query.where(eq(messages.status, statuses[0])) as typeof query;
+      countQuery = countQuery.where(
+        eq(messages.status, statuses[0]),
+      ) as typeof countQuery;
+    } else if (statuses && statuses.length > 1) {
       query = query.where(
-        eq(
-          messages.status,
-          status as
-            | "QUEUED"
-            | "ACCEPTED"
-            | "SENT"
-            | "DELIVERED"
-            | "FAILED",
-        ),
+        inArray(messages.status, statuses),
       ) as typeof query;
+      countQuery = countQuery.where(
+        inArray(messages.status, statuses),
+      ) as typeof countQuery;
     }
 
     const result = await query.limit(limit).offset(offset);
-    const [total] = await db
-      .select({ count: count() })
-      .from(messages);
+    const [total] = await countQuery;
 
     return c.json({
       data: result,
@@ -89,6 +98,7 @@ export const messagesRouter = new Hono<Env>()
         total: total.count,
         limit,
         offset,
+        hasMore: offset + result.length < total.count,
       },
     });
   })

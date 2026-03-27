@@ -8,6 +8,7 @@ import type { MessageStatus } from "@/lib/api";
 import { Button } from "@/components/ui/button";
 import { useNewMessage } from "@/components/sidebar-layout";
 import { useSSEData } from "@/components/sse-provider";
+import { useInfiniteMessages } from "@/hooks/use-infinite-messages";
 import { Loader2, Inbox, Clock, Plus } from "lucide-react";
 import {
   listContainerVariants,
@@ -27,10 +28,24 @@ const filterChips: { value: ProcessedFilter; label: string }[] = [
 
 export function MessageList() {
   const { setOpen } = useNewMessage();
-  const { messages, connected } = useSSEData();
+  const { messages, connected, stats } = useSSEData();
   const [deleteNotice, setDeleteNotice] = useState<string | null>(null);
   const [processedFilter, setProcessedFilter] =
     useState<ProcessedFilter>("all");
+
+  // Derive the statuses for the infinite scroll hook based on the active filter
+  const processedStatuses: MessageStatus[] = useMemo(() => {
+    if (processedFilter === "all") return ["SENT", "DELIVERED", "FAILED"];
+    return [processedFilter];
+  }, [processedFilter]);
+
+  const {
+    messages: processedMessages,
+    isLoading: processedLoading,
+    isLoadingMore,
+    hasMore,
+    sentinelRef,
+  } = useInfiniteMessages({ statuses: processedStatuses, pageSize: 15 });
 
   const handleDelete = async (id: number) => {
     setDeleteNotice(null);
@@ -53,35 +68,18 @@ export function MessageList() {
     }
   };
 
-  const queuedMessages = messages.filter(
-    (m) => m.status === "QUEUED" || m.status === "ACCEPTED"
-  );
-  const processedMessages = messages.filter(
-    (m) => m.status !== "QUEUED" && m.status !== "ACCEPTED"
-  );
+  // Queue column: SSE context now only contains QUEUED/ACCEPTED messages
+  const queuedMessages = messages;
 
-  const filteredProcessed = useMemo(
-    () =>
-      processedFilter === "all"
-        ? processedMessages
-        : processedMessages.filter((m) => m.status === processedFilter),
-    [processedMessages, processedFilter]
-  );
+  // Filter chip counts derived from real-time SSE stats
+  const filterCounts: Record<ProcessedFilter, number> = {
+    all: (stats?.sent ?? 0) + (stats?.delivered ?? 0) + (stats?.failed ?? 0),
+    SENT: stats?.sent ?? 0,
+    DELIVERED: stats?.delivered ?? 0,
+    FAILED: stats?.failed ?? 0,
+  };
 
-  const filterCounts = useMemo(() => {
-    const counts: Record<ProcessedFilter, number> = {
-      all: processedMessages.length,
-      SENT: 0,
-      DELIVERED: 0,
-      FAILED: 0,
-    };
-    for (const m of processedMessages) {
-      if (m.status in counts) counts[m.status as ProcessedFilter]++;
-    }
-    return counts;
-  }, [processedMessages]);
-
-  if (!connected && messages.length === 0) {
+  if (!connected && messages.length === 0 && processedLoading) {
     return (
       <div className="flex items-center justify-center py-12 text-muted-foreground">
         <Loader2 className="h-5 w-5 animate-spin mr-2" />
@@ -179,7 +177,7 @@ export function MessageList() {
                 <div className="h-2 w-2 rounded-full bg-emerald-500" />
                 <h3 className="text-sm font-semibold">Processed</h3>
               </div>
-              {processedMessages.length > 0 && (
+              {filterCounts.all > 0 && (
                 <div className="flex items-center gap-1">
                   {filterChips.map((chip) => (
                     <Button
@@ -203,7 +201,19 @@ export function MessageList() {
             </div>
 
             <AnimatePresence mode="wait">
-              {filteredProcessed.length > 0 ? (
+              {processedLoading ? (
+                <motion.div
+                  key="processed-loading"
+                  variants={fadeScaleVariants}
+                  initial="hidden"
+                  animate="show"
+                  exit="exit"
+                  className="flex items-center justify-center h-30 text-muted-foreground"
+                >
+                  <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                  <p className="text-xs">Loading...</p>
+                </motion.div>
+              ) : processedMessages.length > 0 ? (
                 <motion.div
                   key={`processed-${processedFilter}`}
                   variants={listContainerVariants}
@@ -213,7 +223,7 @@ export function MessageList() {
                   className="space-y-2 overflow-y-auto min-h-0 flex-1 py-px pr-3 pl-px thin-scrollbar"
                 >
                   <AnimatePresence mode="popLayout">
-                    {filteredProcessed.map((message) => (
+                    {processedMessages.map((message) => (
                       <motion.div
                         key={message.id}
                         layout
@@ -226,6 +236,18 @@ export function MessageList() {
                       </motion.div>
                     ))}
                   </AnimatePresence>
+
+                  {/* Infinite scroll sentinel */}
+                  {hasMore && (
+                    <div
+                      ref={sentinelRef}
+                      className="flex justify-center py-4"
+                    >
+                      {isLoadingMore && (
+                        <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
+                      )}
+                    </div>
+                  )}
                 </motion.div>
               ) : (
                 <motion.div
@@ -238,7 +260,7 @@ export function MessageList() {
                 >
                   <Inbox className="h-4 w-4 mb-1" />
                   <p className="text-xs">
-                    {processedMessages.length > 0
+                    {filterCounts.all > 0
                       ? "No messages match this filter"
                       : "No messages processed yet"}
                   </p>

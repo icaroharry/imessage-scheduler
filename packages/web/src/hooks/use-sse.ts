@@ -6,16 +6,25 @@ import type { Message, Stats } from "@/lib/api";
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001";
 
+export type SSEEvent =
+  | { type: "message:created"; data: Message }
+  | { type: "message:updated"; data: Message }
+  | { type: "message:deleted"; data: { id: number } };
+
+export type SSESubscriber = (event: SSEEvent) => void;
+
 export interface SSEData {
   messages: Message[];
   stats: Stats | null;
   gatewayStatus: "checking" | "online" | "offline";
   connected: boolean;
+  subscribe: (callback: SSESubscriber) => () => void;
 }
 
 /**
  * Manages a single EventSource connection to the API's /events SSE endpoint.
  * Fetches initial data via REST, then applies incremental updates from SSE.
+ * Provides a subscribe mechanism for other hooks to receive SSE events.
  */
 export function useSSE(): SSEData {
   const [messages, setMessages] = useState<Message[]>([]);
@@ -28,11 +37,27 @@ export function useSSE(): SSEData {
   // Track whether we've done the initial REST fetch
   const initialFetchDone = useRef(false);
 
+  // Subscriber registry for forwarding SSE events to other hooks
+  const subscribersRef = useRef(new Set<SSESubscriber>());
+
+  const subscribe = useCallback((callback: SSESubscriber) => {
+    subscribersRef.current.add(callback);
+    return () => {
+      subscribersRef.current.delete(callback);
+    };
+  }, []);
+
+  const notifySubscribers = useCallback((event: SSEEvent) => {
+    for (const cb of subscribersRef.current) {
+      cb(event);
+    }
+  }, []);
+
   // Fetch initial data via REST
   const fetchInitialData = useCallback(async () => {
     try {
       const [messagesRes, statsRes] = await Promise.all([
-        api.getMessages({ limit: 200 }),
+        api.getMessages({ status: ["QUEUED", "ACCEPTED"], limit: 200 }),
         api.getStats(),
       ]);
       setMessages(messagesRes.data);
@@ -67,18 +92,28 @@ export function useSSE(): SSEData {
         if (prev.some((m) => m.id === msg.id)) return prev;
         return [msg, ...prev];
       });
+      notifySubscribers({ type: "message:created", data: msg });
     });
 
     es.addEventListener("message:updated", (e) => {
       const msg: Message = JSON.parse(e.data);
-      setMessages((prev) =>
-        prev.map((m) => (m.id === msg.id ? msg : m)),
-      );
+      const isQueueStatus =
+        msg.status === "QUEUED" || msg.status === "ACCEPTED";
+      setMessages((prev) => {
+        if (isQueueStatus) {
+          // Still in queue — update in place
+          return prev.map((m) => (m.id === msg.id ? msg : m));
+        }
+        // Graduated out of queue — remove from the queue-only array
+        return prev.filter((m) => m.id !== msg.id);
+      });
+      notifySubscribers({ type: "message:updated", data: msg });
     });
 
     es.addEventListener("message:deleted", (e) => {
       const { id }: { id: number } = JSON.parse(e.data);
       setMessages((prev) => prev.filter((m) => m.id !== id));
+      notifySubscribers({ type: "message:deleted", data: { id } });
     });
 
     es.addEventListener("stats:updated", (e) => {
@@ -105,7 +140,7 @@ export function useSSE(): SSEData {
     return () => {
       es.close();
     };
-  }, [fetchInitialData]);
+  }, [fetchInitialData, notifySubscribers]);
 
-  return { messages, stats, gatewayStatus, connected };
+  return { messages, stats, gatewayStatus, connected, subscribe };
 }

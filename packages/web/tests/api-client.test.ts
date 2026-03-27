@@ -66,6 +66,16 @@ describe("ApiClient", () => {
       expect(calledUrl).toContain("limit=10");
       expect(calledUrl).toContain("offset=5");
     });
+
+    it("joins status array with commas for multi-status filtering", async () => {
+      mockFetchResponse({ data: [], pagination: {} });
+
+      await api.getMessages({ status: ["SENT", "DELIVERED", "FAILED"] });
+
+      const calledUrl = (globalThis.fetch as ReturnType<typeof vi.fn>).mock
+        .calls[0][0] as string;
+      expect(calledUrl).toContain("status=SENT%2CDELIVERED%2CFAILED");
+    });
   });
 
   describe("getMessage", () => {

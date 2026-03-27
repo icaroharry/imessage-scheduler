@@ -13,7 +13,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import type { MessageStatus } from "@/lib/api";
-import { useSSEData } from "@/components/sse-provider";
+import { useInfiniteMessages } from "@/hooks/use-infinite-messages";
 import { Loader2 } from "lucide-react";
 
 const statusDisplay: Record<MessageStatus, { label: string; className: string; spinning?: boolean }> = {
@@ -24,7 +24,9 @@ const statusDisplay: Record<MessageStatus, { label: string; className: string; s
   FAILED: { label: "Failed", className: "bg-destructive/10 text-destructive" },
 };
 
-const statusFilters: { label: string; value: MessageStatus | "ALL" }[] = [
+type StatusFilter = MessageStatus | "ALL";
+
+const statusFilters: { label: string; value: StatusFilter }[] = [
   { label: "All", value: "ALL" },
   { label: "Queued", value: "QUEUED" },
   { label: "Processing", value: "ACCEPTED" },
@@ -50,18 +52,21 @@ function truncate(str: string, maxLen: number): string {
 }
 
 export function MessageTable() {
-  const { messages, connected } = useSSEData();
-  const [filter, setFilter] = useState<MessageStatus | "ALL">("ALL");
+  const [filter, setFilter] = useState<StatusFilter>("ALL");
 
-  const filtered = useMemo(
-    () =>
-      filter === "ALL"
-        ? messages
-        : messages.filter((m) => m.status === filter),
-    [messages, filter],
-  );
+  const statuses: MessageStatus[] = useMemo(() => {
+    if (filter === "ALL")
+      return ["QUEUED", "ACCEPTED", "SENT", "DELIVERED", "FAILED"];
+    return [filter];
+  }, [filter]);
 
-  const loading = !connected && messages.length === 0;
+  const {
+    messages: filtered,
+    isLoading,
+    isLoadingMore,
+    hasMore,
+    sentinelRef,
+  } = useInfiniteMessages({ statuses, pageSize: 25 });
 
   return (
     <Card>
@@ -86,7 +91,7 @@ export function MessageTable() {
         </div>
       </CardHeader>
       <CardContent>
-        {loading ? (
+        {isLoading ? (
           <div className="flex items-center justify-center py-8 text-muted-foreground">
             <Loader2 className="h-5 w-5 animate-spin mr-2" />
             Loading...
@@ -96,7 +101,7 @@ export function MessageTable() {
             No messages found.
           </div>
         ) : (
-          <div className="overflow-x-auto">
+          <div className="overflow-y-auto max-h-[60vh]">
             <Table>
               <TableHeader>
                 <TableRow>
@@ -149,6 +154,18 @@ export function MessageTable() {
                 ))}
               </TableBody>
             </Table>
+
+            {/* Infinite scroll sentinel */}
+            {hasMore && (
+              <div
+                ref={sentinelRef}
+                className="flex justify-center py-4"
+              >
+                {isLoadingMore && (
+                  <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
+                )}
+              </div>
+            )}
           </div>
         )}
       </CardContent>

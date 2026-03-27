@@ -4,18 +4,41 @@ import userEvent from "@testing-library/user-event";
 import { MessageList } from "@/components/message-list";
 import { createMessage } from "./fixtures";
 import type { SSEData } from "@/hooks/use-sse";
+import type { UseInfiniteMessagesResult } from "@/hooks/use-infinite-messages";
 
-// Default SSE data for tests
+// Default SSE data for tests (now only contains QUEUED/ACCEPTED messages)
 let sseData: SSEData = {
   messages: [],
   stats: null,
   gatewayStatus: "checking",
   connected: true,
+  subscribe: () => () => {},
 };
+
+// Default infinite messages data for processed column
+let infiniteData: UseInfiniteMessagesResult = {
+  messages: [],
+  isLoading: false,
+  isLoadingMore: false,
+  hasMore: false,
+  totalCount: 0,
+  sentinelRef: () => {},
+};
+
+// Track the statuses passed to useInfiniteMessages
+let lastInfiniteStatuses: string[] = [];
 
 // Mock the SSE provider
 vi.mock("@/components/sse-provider", () => ({
   useSSEData: () => sseData,
+}));
+
+// Mock the infinite messages hook
+vi.mock("@/hooks/use-infinite-messages", () => ({
+  useInfiniteMessages: (opts: { statuses: string[] }) => {
+    lastInfiniteStatuses = opts.statuses;
+    return infiniteData;
+  },
 }));
 
 // Mock the API module (still used for deleteMessage)
@@ -46,11 +69,22 @@ describe("MessageList", () => {
       stats: null,
       gatewayStatus: "checking",
       connected: true,
+      subscribe: () => () => {},
     };
+    infiniteData = {
+      messages: [],
+      isLoading: false,
+      isLoadingMore: false,
+      hasMore: false,
+      totalCount: 0,
+      sentinelRef: () => {},
+    };
+    lastInfiniteStatuses = [];
   });
 
   it("shows loading state when not connected and no messages", () => {
     sseData = { ...sseData, connected: false, messages: [] };
+    infiniteData = { ...infiniteData, isLoading: true };
 
     render(<MessageList />);
 
@@ -58,7 +92,12 @@ describe("MessageList", () => {
   });
 
   it("shows both empty placeholders when connected with no messages", () => {
-    sseData = { ...sseData, connected: true, messages: [] };
+    sseData = {
+      ...sseData,
+      connected: true,
+      messages: [],
+      stats: { total: 0, queued: 0, accepted: 0, sent: 0, delivered: 0, failed: 0 },
+    };
 
     render(<MessageList />);
 
@@ -72,10 +111,13 @@ describe("MessageList", () => {
     it("always shows both Queue and Processed headers", () => {
       sseData = {
         ...sseData,
-        messages: [
-          createMessage({ id: 1, status: "QUEUED" }),
-          createMessage({ id: 2, status: "SENT" }),
-        ],
+        messages: [createMessage({ id: 1, status: "QUEUED" })],
+        stats: { total: 2, queued: 1, accepted: 0, sent: 1, delivered: 0, failed: 0 },
+      };
+      infiniteData = {
+        ...infiniteData,
+        messages: [createMessage({ id: 2, status: "SENT" })],
+        totalCount: 1,
       };
 
       render(<MessageList />);
@@ -88,10 +130,16 @@ describe("MessageList", () => {
       const user = userEvent.setup();
       sseData = {
         ...sseData,
+        messages: [],
+        stats: { total: 2, queued: 0, accepted: 0, sent: 1, delivered: 1, failed: 0 },
+      };
+      infiniteData = {
+        ...infiniteData,
         messages: [
           createMessage({ id: 1, status: "SENT" }),
           createMessage({ id: 2, status: "DELIVERED" }),
         ],
+        totalCount: 2,
       };
 
       render(<MessageList />);
@@ -114,6 +162,7 @@ describe("MessageList", () => {
           createMessage({ id: 1, status: "QUEUED" }),
           createMessage({ id: 2, status: "QUEUED" }),
         ],
+        stats: { total: 2, queued: 2, accepted: 0, sent: 0, delivered: 0, failed: 0 },
       };
 
       render(<MessageList />);
@@ -129,8 +178,15 @@ describe("MessageList", () => {
         messages: [
           createMessage({ id: 1, status: "ACCEPTED", phone: "+15550001111" }),
           createMessage({ id: 2, status: "QUEUED", phone: "+15550003333" }),
+        ],
+        stats: { total: 3, queued: 1, accepted: 1, sent: 0, delivered: 1, failed: 0 },
+      };
+      infiniteData = {
+        ...infiniteData,
+        messages: [
           createMessage({ id: 3, status: "DELIVERED", phone: "+15550002222" }),
         ],
+        totalCount: 1,
       };
 
       render(<MessageList />);
@@ -146,8 +202,13 @@ describe("MessageList", () => {
         messages: [
           createMessage({ id: 1, status: "QUEUED" }),
           createMessage({ id: 2, status: "QUEUED" }),
-          createMessage({ id: 3, status: "SENT" }),
         ],
+        stats: { total: 3, queued: 2, accepted: 0, sent: 1, delivered: 0, failed: 0 },
+      };
+      infiniteData = {
+        ...infiniteData,
+        messages: [createMessage({ id: 3, status: "SENT" })],
+        totalCount: 1,
       };
 
       render(<MessageList />);
@@ -161,10 +222,16 @@ describe("MessageList", () => {
     it("shows filter chips when processed messages exist", () => {
       sseData = {
         ...sseData,
+        messages: [],
+        stats: { total: 2, queued: 0, accepted: 0, sent: 0, delivered: 1, failed: 1 },
+      };
+      infiniteData = {
+        ...infiniteData,
         messages: [
           createMessage({ id: 1, status: "DELIVERED" }),
           createMessage({ id: 2, status: "FAILED" }),
         ],
+        totalCount: 2,
       };
 
       render(<MessageList />);
@@ -179,6 +246,7 @@ describe("MessageList", () => {
       sseData = {
         ...sseData,
         messages: [createMessage({ id: 1, status: "QUEUED" })],
+        stats: { total: 1, queued: 1, accepted: 0, sent: 0, delivered: 0, failed: 0 },
       };
 
       render(<MessageList />);
@@ -191,10 +259,16 @@ describe("MessageList", () => {
       const user = userEvent.setup();
       sseData = {
         ...sseData,
+        messages: [],
+        stats: { total: 2, queued: 0, accepted: 0, sent: 0, delivered: 1, failed: 1 },
+      };
+      infiniteData = {
+        ...infiniteData,
         messages: [
           createMessage({ id: 1, status: "DELIVERED", phone: "+15550001111" }),
           createMessage({ id: 2, status: "FAILED", phone: "+15550002222" }),
         ],
+        totalCount: 2,
       };
 
       render(<MessageList />);
@@ -204,18 +278,26 @@ describe("MessageList", () => {
 
       await user.click(screen.getByRole("button", { name: /Failed/ }));
 
-      expect(screen.queryByText("+15550001111")).not.toBeInTheDocument();
-      expect(screen.getByText("+15550002222")).toBeInTheDocument();
+      // After clicking, the hook is called with ["FAILED"] statuses
+      // Since the hook is mocked, it still returns the same messages
+      // but the important thing is the filter was triggered
+      expect(lastInfiniteStatuses).toEqual(["FAILED"]);
     });
 
     it("filters to show only delivered messages", async () => {
       const user = userEvent.setup();
       sseData = {
         ...sseData,
+        messages: [],
+        stats: { total: 2, queued: 0, accepted: 0, sent: 0, delivered: 1, failed: 1 },
+      };
+      infiniteData = {
+        ...infiniteData,
         messages: [
           createMessage({ id: 1, status: "DELIVERED", phone: "+15550001111" }),
           createMessage({ id: 2, status: "FAILED", phone: "+15550002222" }),
         ],
+        totalCount: 2,
       };
 
       render(<MessageList />);
@@ -224,22 +306,30 @@ describe("MessageList", () => {
 
       await user.click(screen.getByRole("button", { name: /Delivered/ }));
 
-      expect(screen.getByText("+15550001111")).toBeInTheDocument();
-      expect(screen.queryByText("+15550002222")).not.toBeInTheDocument();
+      expect(lastInfiniteStatuses).toEqual(["DELIVERED"]);
     });
 
     it("shows empty filter state when no messages match", async () => {
       const user = userEvent.setup();
       sseData = {
         ...sseData,
+        messages: [],
+        stats: { total: 1, queued: 0, accepted: 0, sent: 0, delivered: 1, failed: 0 },
+      };
+      infiniteData = {
+        ...infiniteData,
         messages: [
           createMessage({ id: 1, status: "DELIVERED", phone: "+15550001111" }),
         ],
+        totalCount: 1,
       };
 
       render(<MessageList />);
 
       expect(screen.getByText("+15550001111")).toBeInTheDocument();
+
+      // Update infinite data to return empty for FAILED filter
+      infiniteData = { ...infiniteData, messages: [], totalCount: 0 };
 
       await user.click(screen.getByRole("button", { name: /Failed/ }));
 
@@ -252,10 +342,16 @@ describe("MessageList", () => {
       const user = userEvent.setup();
       sseData = {
         ...sseData,
+        messages: [],
+        stats: { total: 2, queued: 0, accepted: 0, sent: 0, delivered: 1, failed: 1 },
+      };
+      infiniteData = {
+        ...infiniteData,
         messages: [
           createMessage({ id: 1, status: "DELIVERED", phone: "+15550001111" }),
           createMessage({ id: 2, status: "FAILED", phone: "+15550002222" }),
         ],
+        totalCount: 2,
       };
 
       render(<MessageList />);
@@ -264,12 +360,13 @@ describe("MessageList", () => {
 
       // Filter to failed only
       await user.click(screen.getByRole("button", { name: /Failed/ }));
-      expect(screen.queryByText("+15550001111")).not.toBeInTheDocument();
+      expect(lastInfiniteStatuses).toEqual(["FAILED"]);
 
       // Back to all
       await user.click(screen.getByRole("button", { name: /All/ }));
-      expect(screen.getByText("+15550001111")).toBeInTheDocument();
-      expect(screen.getByText("+15550002222")).toBeInTheDocument();
+      expect(lastInfiniteStatuses).toEqual(
+        expect.arrayContaining(["SENT", "DELIVERED", "FAILED"])
+      );
     });
   });
 
@@ -278,6 +375,7 @@ describe("MessageList", () => {
     sseData = {
       ...sseData,
       messages: [createMessage({ id: 1, status: "QUEUED", phone: "+15550001111" })],
+      stats: { total: 1, queued: 1, accepted: 0, sent: 0, delivered: 0, failed: 0 },
     };
     mockApi.deleteMessage.mockResolvedValue({ message: "Deleted" });
 
@@ -297,6 +395,7 @@ describe("MessageList", () => {
     sseData = {
       ...sseData,
       messages: [createMessage({ id: 1, status: "QUEUED", phone: "+15550001111" })],
+      stats: { total: 1, queued: 1, accepted: 0, sent: 0, delivered: 0, failed: 0 },
     };
     mockApi.deleteMessage.mockRejectedValue(
       new Error("Can only delete messages with QUEUED status")
@@ -322,6 +421,7 @@ describe("MessageList", () => {
     sseData = {
       ...sseData,
       messages: [createMessage({ id: 1, status: "QUEUED", phone: "+15550001111" })],
+      stats: { total: 1, queued: 1, accepted: 0, sent: 0, delivered: 0, failed: 0 },
     };
     mockApi.deleteMessage.mockRejectedValue("string error");
 

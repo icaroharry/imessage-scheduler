@@ -9,6 +9,7 @@ const SSEContext = createContext<SSEData>({
   stats: null,
   gatewayStatus: "checking",
   connected: false,
+  subscribe: () => () => {},
 });
 
 export function SSEProvider({ children }: { children: React.ReactNode }) {

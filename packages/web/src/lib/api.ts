@@ -26,6 +26,7 @@ export interface PaginatedResponse<T> {
     total: number;
     limit: number;
     offset: number;
+    hasMore: boolean;
   };
 }
 
@@ -73,12 +74,17 @@ class ApiClient {
 
   // Messages
   async getMessages(params?: {
-    status?: MessageStatus;
+    status?: MessageStatus | MessageStatus[];
     limit?: number;
     offset?: number;
   }): Promise<PaginatedResponse<Message>> {
     const searchParams = new URLSearchParams();
-    if (params?.status) searchParams.set("status", params.status);
+    if (params?.status) {
+      const statusStr = Array.isArray(params.status)
+        ? params.status.join(",")
+        : params.status;
+      searchParams.set("status", statusStr);
+    }
     if (params?.limit) searchParams.set("limit", String(params.limit));
     if (params?.offset) searchParams.set("offset", String(params.offset));
 
