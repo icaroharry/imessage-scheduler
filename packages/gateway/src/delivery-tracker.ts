@@ -38,49 +38,169 @@ function normalizePhone(phone: string): string {
 }
 
 /**
+ * Typedstream metadata strings that appear in attributedBody blobs
+ * but are not message text. Used by the fallback extractor to filter
+ * out noise.
+ */
+const TYPEDSTREAM_METADATA = [
+  "streamtyped",
+  "NSMutableAttributedString",
+  "NSAttributedString",
+  "NSMutableString",
+  "NSString",
+  "NSObject",
+  "NSDictionary",
+  "NSNumber",
+  "NSValue",
+  "NSFont",
+  "NSParagraphStyle",
+  "NSData",
+  "NSArray",
+  "NSColor",
+  "bplist",
+  "NSKeyedArchiver",
+  "__kIM",
+];
+
+/**
  * Extract plain text from a macOS Messages attributedBody blob.
  *
  * Modern macOS (Ventura+) stores message text in the `attributedBody` column
- * as an NSKeyedArchiver binary plist containing an NSAttributedString.
- * The plain text is embedded after a `\x01+` marker: 2 bytes marker,
- * 1 byte length, then UTF-8 text.
+ * as an NSArchiver typedstream containing an NSAttributedString.
  *
- * For messages longer than 127 bytes, the length is encoded differently
- * (multi-byte), so we also fall back to scanning for the text between
- * known markers.
+ * Primary method: find the typedstream string marker `\x84\x01+` (new data
+ * blob → 1-byte type encoding → type `+` = unshared string), then read
+ * the length-prefixed UTF-8 text that follows.
+ *
+ * Length encoding (typedstream integer format):
+ * - 0x00–0x7F: literal single-byte value
+ * - 0x81: next 2 bytes are a 16-bit little-endian integer
+ * - 0x82: next 4 bytes are a 32-bit little-endian integer
+ *
+ * Fallback: if the marker isn't found, scan for the longest readable
+ * UTF-8 segment that isn't a typedstream class name.
  */
-function extractTextFromAttributedBody(blob: Buffer): string | null {
+export function extractTextFromAttributedBody(blob: Buffer): string | null {
   if (!blob || blob.length === 0) return null;
 
-  // Find the \x01+ marker
-  const marker = Buffer.from([0x01, 0x2b]); // \x01+
+  // Try structured extraction first, then fall back to text scanning
+  return extractViaMarker(blob) ?? extractFallbackText(blob);
+}
+
+/**
+ * Primary extraction: locate the `0x84 0x01 0x2b` typedstream marker
+ * (new-blob, 1-byte type tag, "+" = unshared string) and read the
+ * length-prefixed UTF-8 text that follows.
+ */
+function extractViaMarker(blob: Buffer): string | null {
+  const marker = Buffer.from([0x84, 0x01, 0x2b]);
   const idx = blob.indexOf(marker);
   if (idx < 0) return null;
 
-  const start = idx + 2;
+  // Length byte immediately follows the 3-byte marker
+  const start = idx + 3;
   if (start >= blob.length) return null;
 
   const lengthByte = blob[start];
 
-  // Simple case: length fits in one byte (< 128)
-  if (lengthByte < 128) {
+  // Single-byte length (0–127)
+  if (lengthByte < 0x80) {
     const textStart = start + 1;
     const textEnd = textStart + lengthByte;
     if (textEnd > blob.length) return null;
     return blob.subarray(textStart, textEnd).toString("utf-8");
   }
 
-  // Multi-byte length (messages > 127 chars): the high bit is set.
-  // The low 4 bits indicate how many following bytes encode the length.
-  const extraBytes = lengthByte & 0x0f;
-  let length = 0;
-  for (let i = 0; i < extraBytes; i++) {
-    length |= blob[start + 1 + i] << (8 * i);
+  // 0x81 → 16-bit little-endian length (2 bytes follow)
+  if (lengthByte === 0x81) {
+    if (start + 3 > blob.length) return null;
+    const length = blob[start + 1] | (blob[start + 2] << 8);
+    const textStart = start + 3;
+    const textEnd = textStart + length;
+    if (textEnd > blob.length) return null;
+    return blob.subarray(textStart, textEnd).toString("utf-8");
   }
-  const textStart = start + 1 + extraBytes;
-  const textEnd = textStart + length;
-  if (textEnd > blob.length) return null;
-  return blob.subarray(textStart, textEnd).toString("utf-8");
+
+  // 0x82 → 32-bit little-endian length (4 bytes follow)
+  if (lengthByte === 0x82) {
+    if (start + 5 > blob.length) return null;
+    const length = blob.readUInt32LE(start + 1);
+    const textStart = start + 5;
+    const textEnd = textStart + length;
+    if (textEnd > blob.length) return null;
+    return blob.subarray(textStart, textEnd).toString("utf-8");
+  }
+
+  return null;
+}
+
+/**
+ * Fallback extraction: scan the blob for readable UTF-8 text segments
+ * and return the longest one that isn't a typedstream class name.
+ *
+ * This handles corrupted blobs, format changes, or unusual encoding.
+ */
+function extractFallbackText(blob: Buffer): string | null {
+  const segments: string[] = [];
+  let current = "";
+  let i = 0;
+
+  while (i < blob.length) {
+    const byte = blob[i];
+
+    // Printable ASCII (space through tilde) plus common whitespace
+    if ((byte >= 0x20 && byte <= 0x7e) || byte === 0x09 || byte === 0x0a || byte === 0x0d) {
+      current += String.fromCharCode(byte);
+      i++;
+      continue;
+    }
+
+    // Multi-byte UTF-8 sequences
+    const seqLen = utf8SequenceLength(byte);
+    if (seqLen > 1 && i + seqLen <= blob.length) {
+      const slice = blob.subarray(i, i + seqLen);
+      try {
+        const char = slice.toString("utf-8");
+        // Verify it decoded to exactly one codepoint (not replacement char)
+        if (char.length > 0 && !char.includes("\ufffd")) {
+          current += char;
+          i += seqLen;
+          continue;
+        }
+      } catch {
+        // Invalid sequence, treat as segment boundary
+      }
+    }
+
+    // Non-text byte: end current segment
+    if (current.length > 0) {
+      segments.push(current);
+      current = "";
+    }
+    i++;
+  }
+
+  if (current.length > 0) {
+    segments.push(current);
+  }
+
+  // Filter out typedstream metadata and short noise, return longest match
+  const cleaned = segments
+    .map((s) => s.trim())
+    .filter((s) => s.length > 1 && !TYPEDSTREAM_METADATA.includes(s));
+
+  if (cleaned.length === 0) return null;
+
+  // The message body is almost always the longest readable segment
+  return cleaned.reduce((a, b) => (a.length >= b.length ? a : b));
+}
+
+/** Return the expected byte length of a UTF-8 sequence from its first byte, or 0 if invalid. */
+function utf8SequenceLength(byte: number): number {
+  if ((byte & 0xe0) === 0xc0) return 2;
+  if ((byte & 0xf0) === 0xe0) return 3;
+  if ((byte & 0xf8) === 0xf0) return 4;
+  return 0;
 }
 
 /**
