@@ -2,7 +2,7 @@ import { Hono } from "hono";
 import { logger } from "hono/logger";
 import { cors } from "hono/cors";
 import { z } from "zod";
-import { sendIMessage } from "./imessage.js";
+import { sendIMessage, openFullDiskAccessSettings } from "./imessage.js";
 import { StatusTracker } from "./status-tracker.js";
 
 const sendMessageSchema = z.object({
@@ -14,14 +14,17 @@ const sendMessageSchema = z.object({
 export function createGatewayApp(
   apiBaseUrl: string = "http://localhost:3001",
 ) {
-  const app = new Hono();
+  const app = new Hono() as Hono & { tracker: StatusTracker };
   const tracker = new StatusTracker(apiBaseUrl);
+
+  // Expose tracker for graceful shutdown
+  app.tracker = tracker;
 
   app.use("*", logger());
   app.use(
     "*",
     cors({
-      origin: ["http://localhost:3001"],
+      origin: ["http://localhost:3000", "http://localhost:3001"],
       allowMethods: ["GET", "POST", "OPTIONS"],
       allowHeaders: ["Content-Type"],
     }),
@@ -35,6 +38,18 @@ export function createGatewayApp(
       timestamp: new Date().toISOString(),
       system: info,
     });
+  });
+
+  // Open macOS System Settings to Full Disk Access pane
+  app.post("/open-fda-settings", async (c) => {
+    const opened = await openFullDiskAccessSettings();
+    if (opened) {
+      return c.json({ success: true, message: "Opened Full Disk Access settings" });
+    }
+    return c.json(
+      { success: false, message: "Could not open settings (not macOS?)" },
+      400,
+    );
   });
 
   // Send a message via iMessage
@@ -56,20 +71,32 @@ export function createGatewayApp(
 
     console.log(`[Gateway] Sending message ${id} to ${phone}`);
 
+    // Capture the timestamp BEFORE calling osascript, so it is guaranteed
+    // to be earlier than the chat.db `date` column for this message.
+    // Subtract a small buffer (5s) to account for any clock drift between
+    // Node.js and the Core Data timestamps Messages.app writes.
+    const sentAt = new Date(Date.now() - 5000);
+
     const result = await sendIMessage(phone, body);
 
     if (result.success) {
-      console.log(`[Gateway] Message ${id} sent successfully`);
+      console.log(`[Gateway] Message ${id} accepted by Messages.app — tracking delivery`);
 
-      // Report DELIVERED status back to API
-      // In a production system, we'd poll chat.db for actual delivery confirmation.
-      // For this assessment, we optimistically report DELIVERED after a successful send.
-      await tracker.reportStatus(id, "DELIVERED");
+      // Do NOT report SENT here. osascript succeeding only means Messages.app
+      // accepted the command — not that the message was actually sent.
+      // The StatusTracker will report the real status (SENT/DELIVERED/FAILED)
+      // after confirming via chat.db.
+      tracker.trackDelivery({
+        messageId: id,
+        phone,
+        body,
+        sentAt,
+      });
 
       return c.json({
         success: true,
         messageId: id,
-        status: "SENT",
+        status: "ACCEPTED",
       });
     } else {
       console.error(`[Gateway] Message ${id} failed: ${result.error}`);

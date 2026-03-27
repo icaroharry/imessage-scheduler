@@ -5,7 +5,14 @@ import { createGatewayApp } from "../src/app.js";
 vi.mock("../src/imessage.js", () => ({
   sendIMessage: vi.fn(),
   isChatDbAvailable: vi.fn(() => false),
+  isChatDbReadable: vi.fn(() => false),
   getChatDbPath: vi.fn(() => "/Users/test/Library/Messages/chat.db"),
+  openFullDiskAccessSettings: vi.fn(() => Promise.resolve(true)),
+}));
+
+// Mock the delivery-tracker module (no real chat.db in tests)
+vi.mock("../src/delivery-tracker.js", () => ({
+  checkDelivery: vi.fn(() => ({ delivered: false, found: false, accessError: false, sendFailed: false })),
 }));
 
 // Get the mocked function
@@ -36,11 +43,12 @@ describe("Gateway API", () => {
       expect(json.timestamp).toBeDefined();
       expect(json.system).toBeDefined();
       expect(json.system.platform).toBeDefined();
+      expect(json.system.chatDbAvailable).toBeDefined();
     });
   });
 
   describe("POST /send", () => {
-    it("should send a message successfully", async () => {
+    it("should send a message successfully and return ACCEPTED", async () => {
       mockedSendIMessage.mockResolvedValue({ success: true });
 
       const res = await app.request("/send", {
@@ -57,12 +65,47 @@ describe("Gateway API", () => {
       const json = await res.json();
       expect(json.success).toBe(true);
       expect(json.messageId).toBe(1);
-      expect(json.status).toBe("SENT");
+      // Gateway returns ACCEPTED — the tracker determines final status
+      expect(json.status).toBe("ACCEPTED");
 
       expect(mockedSendIMessage).toHaveBeenCalledWith(
         "+15551234567",
         "Hello, world!",
       );
+    });
+
+    it("should delegate status reporting to the delivery tracker", async () => {
+      mockedSendIMessage.mockResolvedValue({ success: true });
+      const mockFetch = vi.mocked(global.fetch);
+
+      await app.request("/send", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          id: 5,
+          phone: "+15551234567",
+          body: "Track this",
+        }),
+      });
+
+      // The delivery tracker reports status asynchronously via chat.db polling.
+      // Since chat.db is mocked as unavailable, it falls back to optimistic
+      // SENT → DELIVERED. Allow async work to complete.
+      await new Promise((r) => setTimeout(r, 0));
+
+      // Verify SENT was reported by the tracker (not the gateway handler)
+      const sentCall = mockFetch.mock.calls.find((call) => {
+        const body = JSON.parse(call[1]?.body as string);
+        return body.status === "SENT";
+      });
+      expect(sentCall).toBeDefined();
+
+      // Verify DELIVERED was also reported (optimistic fallback)
+      const deliveredCall = mockFetch.mock.calls.find((call) => {
+        const body = JSON.parse(call[1]?.body as string);
+        return body.status === "DELIVERED";
+      });
+      expect(deliveredCall).toBeDefined();
     });
 
     it("should handle send failure", async () => {
@@ -85,30 +128,6 @@ describe("Gateway API", () => {
       const json = await res.json();
       expect(json.success).toBe(false);
       expect(json.error).toBe("Messages.app not available");
-    });
-
-    it("should report delivery status back to API on success", async () => {
-      mockedSendIMessage.mockResolvedValue({ success: true });
-      const mockFetch = vi.mocked(global.fetch);
-
-      await app.request("/send", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          id: 5,
-          phone: "+15551234567",
-          body: "Track this",
-        }),
-      });
-
-      // Should have called the API to report DELIVERED status
-      expect(mockFetch).toHaveBeenCalledWith(
-        "http://localhost:3001/messages/5",
-        expect.objectContaining({
-          method: "PATCH",
-          headers: { "Content-Type": "application/json" },
-        }),
-      );
     });
 
     it("should report FAILED status back to API on failure", async () => {
@@ -134,6 +153,15 @@ describe("Gateway API", () => {
           method: "PATCH",
         }),
       );
+
+      // Verify FAILED status was reported with error message
+      const failedCall = mockFetch.mock.calls.find((call) => {
+        const body = JSON.parse(call[1]?.body as string);
+        return body.status === "FAILED";
+      });
+      expect(failedCall).toBeDefined();
+      const failedBody = JSON.parse(failedCall![1]?.body as string);
+      expect(failedBody.errorMessage).toBe("osascript timeout");
     });
 
     it("should reject missing fields", async () => {

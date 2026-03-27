@@ -23,3 +23,13 @@ serve({
   fetch: app.fetch,
   port: PORT,
 });
+
+// Graceful shutdown — stop delivery polling
+const shutdown = () => {
+  console.log("[Gateway] Shutting down...");
+  app.tracker.stopAll();
+  process.exit(0);
+};
+
+process.on("SIGINT", shutdown);
+process.on("SIGTERM", shutdown);
