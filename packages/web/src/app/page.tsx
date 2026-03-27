@@ -7,7 +7,7 @@ export default function HomePage() {
   const { refreshKey } = useNewMessage();
 
   return (
-    <div className="max-w-2xl mx-auto px-4 py-6">
+    <div className="px-6 py-6">
       <MessageList refreshTrigger={refreshKey} />
     </div>
   );

@@ -12,6 +12,16 @@ vi.mock("@/lib/api", () => ({
   },
 }));
 
+// Mock useNewMessage context
+const mockSetOpen = vi.fn();
+vi.mock("@/components/sidebar-layout", () => ({
+  useNewMessage: () => ({
+    open: false,
+    setOpen: mockSetOpen,
+    refreshKey: 0,
+  }),
+}));
+
 import { api } from "@/lib/api";
 const mockApi = vi.mocked(api);
 
@@ -33,7 +43,7 @@ describe("MessageList", () => {
     expect(screen.getByText("Loading messages...")).toBeInTheDocument();
   });
 
-  it("shows empty state when no messages", async () => {
+  it("shows both empty placeholders when no messages", async () => {
     mockApi.getMessages.mockResolvedValue({
       data: [],
       pagination: { total: 0, limit: 50, offset: 0 },
@@ -42,7 +52,10 @@ describe("MessageList", () => {
     render(<MessageList />);
 
     await waitFor(() => {
-      expect(screen.getByText("No messages yet.")).toBeInTheDocument();
+      expect(screen.getByText("Queue is empty")).toBeInTheDocument();
+      expect(
+        screen.getByText("No messages processed yet")
+      ).toBeInTheDocument();
     });
   });
 
@@ -80,72 +93,230 @@ describe("MessageList", () => {
     });
   });
 
-  it("separates queued messages as 'Scheduled Messages'", async () => {
-    mockApi.getMessages.mockResolvedValue({
-      data: [
-        createMessage({ id: 1, status: "QUEUED" }),
-        createMessage({ id: 2, status: "SENT" }),
-      ],
-      pagination: { total: 2, limit: 50, offset: 0 },
+  describe("two-column layout", () => {
+    it("always shows both Queue and Processed headers", async () => {
+      mockApi.getMessages.mockResolvedValue({
+        data: [
+          createMessage({ id: 1, status: "QUEUED" }),
+          createMessage({ id: 2, status: "SENT" }),
+        ],
+        pagination: { total: 2, limit: 50, offset: 0 },
+      });
+
+      render(<MessageList />);
+
+      await waitFor(() => {
+        expect(screen.getByText("Queue")).toBeInTheDocument();
+        expect(screen.getByText("Processed")).toBeInTheDocument();
+      });
     });
 
-    render(<MessageList />);
+    it("shows empty queue placeholder with schedule button when all messages are processed", async () => {
+      const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
+      mockApi.getMessages.mockResolvedValue({
+        data: [
+          createMessage({ id: 1, status: "SENT" }),
+          createMessage({ id: 2, status: "DELIVERED" }),
+        ],
+        pagination: { total: 2, limit: 50, offset: 0 },
+      });
 
-    await waitFor(() => {
-      expect(screen.getByText("Scheduled Messages")).toBeInTheDocument();
-      expect(screen.getByText("Processed Messages")).toBeInTheDocument();
+      render(<MessageList />);
+
+      await waitFor(() => {
+        expect(screen.getByText("Queue is empty")).toBeInTheDocument();
+      });
+
+      const scheduleBtn = screen.getByRole("button", {
+        name: /schedule message/i,
+      });
+      expect(scheduleBtn).toBeInTheDocument();
+
+      await user.click(scheduleBtn);
+      expect(mockSetOpen).toHaveBeenCalledWith(true);
+    });
+
+    it("shows empty processed placeholder when all messages are queued", async () => {
+      mockApi.getMessages.mockResolvedValue({
+        data: [
+          createMessage({ id: 1, status: "QUEUED" }),
+          createMessage({ id: 2, status: "QUEUED" }),
+        ],
+        pagination: { total: 2, limit: 50, offset: 0 },
+      });
+
+      render(<MessageList />);
+
+      await waitFor(() => {
+        expect(
+          screen.getByText("No messages processed yet")
+        ).toBeInTheDocument();
+      });
+    });
+
+    it("groups ACCEPTED messages in the Queue column", async () => {
+      mockApi.getMessages.mockResolvedValue({
+        data: [
+          createMessage({ id: 1, status: "ACCEPTED", phone: "+15550001111" }),
+          createMessage({ id: 2, status: "QUEUED", phone: "+15550003333" }),
+          createMessage({ id: 3, status: "DELIVERED", phone: "+15550002222" }),
+        ],
+        pagination: { total: 3, limit: 50, offset: 0 },
+      });
+
+      render(<MessageList />);
+
+      await waitFor(() => {
+        expect(screen.getByText("(2)")).toBeInTheDocument(); // Queue count
+        expect(screen.getByText("+15550001111")).toBeInTheDocument();
+        expect(screen.getByText("+15550002222")).toBeInTheDocument();
+      });
+    });
+
+    it("displays correct queue count in header", async () => {
+      mockApi.getMessages.mockResolvedValue({
+        data: [
+          createMessage({ id: 1, status: "QUEUED" }),
+          createMessage({ id: 2, status: "QUEUED" }),
+          createMessage({ id: 3, status: "SENT" }),
+        ],
+        pagination: { total: 3, limit: 50, offset: 0 },
+      });
+
+      render(<MessageList />);
+
+      await waitFor(() => {
+        expect(screen.getByText("(2)")).toBeInTheDocument();
+      });
     });
   });
 
-  it("shows only 'Scheduled Messages' when all are queued", async () => {
-    mockApi.getMessages.mockResolvedValue({
-      data: [
-        createMessage({ id: 1, status: "QUEUED" }),
-        createMessage({ id: 2, status: "QUEUED" }),
-      ],
-      pagination: { total: 2, limit: 50, offset: 0 },
+  describe("filter chips", () => {
+    it("shows filter chips when processed messages exist", async () => {
+      mockApi.getMessages.mockResolvedValue({
+        data: [
+          createMessage({ id: 1, status: "DELIVERED" }),
+          createMessage({ id: 2, status: "FAILED" }),
+        ],
+        pagination: { total: 2, limit: 50, offset: 0 },
+      });
+
+      render(<MessageList />);
+
+      await waitFor(() => {
+        expect(screen.getByRole("button", { name: /All/ })).toBeInTheDocument();
+        expect(screen.getByRole("button", { name: /Delivered/ })).toBeInTheDocument();
+        expect(screen.getByRole("button", { name: /Sent/ })).toBeInTheDocument();
+        expect(screen.getByRole("button", { name: /Failed/ })).toBeInTheDocument();
+      });
     });
 
-    render(<MessageList />);
+    it("does not show filter chips when no processed messages", async () => {
+      mockApi.getMessages.mockResolvedValue({
+        data: [createMessage({ id: 1, status: "QUEUED" })],
+        pagination: { total: 1, limit: 50, offset: 0 },
+      });
 
-    await waitFor(() => {
-      expect(screen.getByText("Scheduled Messages")).toBeInTheDocument();
-    });
-    expect(screen.queryByText("Processed Messages")).not.toBeInTheDocument();
-  });
+      render(<MessageList />);
 
-  it("shows only 'Processed Messages' when none are queued", async () => {
-    mockApi.getMessages.mockResolvedValue({
-      data: [
-        createMessage({ id: 1, status: "SENT" }),
-        createMessage({ id: 2, status: "DELIVERED" }),
-      ],
-      pagination: { total: 2, limit: 50, offset: 0 },
+      await waitFor(() => {
+        expect(screen.getByText("Queue")).toBeInTheDocument();
+      });
+
+      expect(screen.queryByRole("button", { name: /^All/ })).not.toBeInTheDocument();
     });
 
-    render(<MessageList />);
+    it("filters to show only failed messages", async () => {
+      const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
+      mockApi.getMessages.mockResolvedValue({
+        data: [
+          createMessage({ id: 1, status: "DELIVERED", phone: "+15550001111" }),
+          createMessage({ id: 2, status: "FAILED", phone: "+15550002222" }),
+        ],
+        pagination: { total: 2, limit: 50, offset: 0 },
+      });
 
-    await waitFor(() => {
-      expect(screen.getByText("Processed Messages")).toBeInTheDocument();
+      render(<MessageList />);
+
+      await waitFor(() => {
+        expect(screen.getByText("+15550001111")).toBeInTheDocument();
+        expect(screen.getByText("+15550002222")).toBeInTheDocument();
+      });
+
+      await user.click(screen.getByRole("button", { name: /Failed/ }));
+
+      expect(screen.queryByText("+15550001111")).not.toBeInTheDocument();
+      expect(screen.getByText("+15550002222")).toBeInTheDocument();
     });
-    expect(screen.queryByText("Scheduled Messages")).not.toBeInTheDocument();
-  });
 
-  it("displays correct counts in section headers", async () => {
-    mockApi.getMessages.mockResolvedValue({
-      data: [
-        createMessage({ id: 1, status: "QUEUED" }),
-        createMessage({ id: 2, status: "QUEUED" }),
-        createMessage({ id: 3, status: "SENT" }),
-      ],
-      pagination: { total: 3, limit: 50, offset: 0 },
+    it("filters to show only delivered messages", async () => {
+      const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
+      mockApi.getMessages.mockResolvedValue({
+        data: [
+          createMessage({ id: 1, status: "DELIVERED", phone: "+15550001111" }),
+          createMessage({ id: 2, status: "FAILED", phone: "+15550002222" }),
+        ],
+        pagination: { total: 2, limit: 50, offset: 0 },
+      });
+
+      render(<MessageList />);
+
+      await waitFor(() => {
+        expect(screen.getByText("+15550001111")).toBeInTheDocument();
+      });
+
+      await user.click(screen.getByRole("button", { name: /Delivered/ }));
+
+      expect(screen.getByText("+15550001111")).toBeInTheDocument();
+      expect(screen.queryByText("+15550002222")).not.toBeInTheDocument();
     });
 
-    render(<MessageList />);
+    it("shows empty filter state when no messages match", async () => {
+      const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
+      mockApi.getMessages.mockResolvedValue({
+        data: [
+          createMessage({ id: 1, status: "DELIVERED", phone: "+15550001111" }),
+        ],
+        pagination: { total: 1, limit: 50, offset: 0 },
+      });
 
-    await waitFor(() => {
-      expect(screen.getByText("(2)")).toBeInTheDocument();
-      expect(screen.getByText("(1)")).toBeInTheDocument();
+      render(<MessageList />);
+
+      await waitFor(() => {
+        expect(screen.getByText("+15550001111")).toBeInTheDocument();
+      });
+
+      await user.click(screen.getByRole("button", { name: /Failed/ }));
+
+      expect(
+        screen.getByText("No messages match this filter")
+      ).toBeInTheDocument();
+    });
+
+    it("returns to all when All chip is clicked", async () => {
+      const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
+      mockApi.getMessages.mockResolvedValue({
+        data: [
+          createMessage({ id: 1, status: "DELIVERED", phone: "+15550001111" }),
+          createMessage({ id: 2, status: "FAILED", phone: "+15550002222" }),
+        ],
+        pagination: { total: 2, limit: 50, offset: 0 },
+      });
+
+      render(<MessageList />);
+
+      await waitFor(() => {
+        expect(screen.getByText("+15550001111")).toBeInTheDocument();
+      });
+
+      // Filter to failed only
+      await user.click(screen.getByRole("button", { name: /Failed/ }));
+      expect(screen.queryByText("+15550001111")).not.toBeInTheDocument();
+
+      // Back to all
+      await user.click(screen.getByRole("button", { name: /All/ }));
+      expect(screen.getByText("+15550001111")).toBeInTheDocument();
+      expect(screen.getByText("+15550002222")).toBeInTheDocument();
     });
   });
 

@@ -1,20 +1,32 @@
 "use client";
 
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useMemo } from "react";
 import { MessageCard } from "./message-card";
 import { api } from "@/lib/api";
-import type { Message } from "@/lib/api";
+import type { Message, MessageStatus } from "@/lib/api";
 import { Button } from "@/components/ui/button";
-import { Loader2 } from "lucide-react";
+import { useNewMessage } from "@/components/sidebar-layout";
+import { Loader2, Inbox, Clock, Plus } from "lucide-react";
+
+type ProcessedFilter = "all" | "SENT" | "DELIVERED" | "FAILED";
+
+const filterChips: { value: ProcessedFilter; label: string }[] = [
+  { value: "all", label: "All" },
+  { value: "DELIVERED", label: "Delivered" },
+  { value: "SENT", label: "Sent" },
+  { value: "FAILED", label: "Failed" },
+];
 
 interface MessageListProps {
   refreshTrigger?: number;
 }
 
 export function MessageList({ refreshTrigger }: MessageListProps) {
+  const { setOpen } = useNewMessage();
   const [messages, setMessages] = useState<Message[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [processedFilter, setProcessedFilter] = useState<ProcessedFilter>("all");
 
   const fetchMessages = useCallback(async () => {
     try {
@@ -47,6 +59,34 @@ export function MessageList({ refreshTrigger }: MessageListProps) {
     }
   };
 
+  const queuedMessages = messages.filter(
+    (m) => m.status === "QUEUED" || m.status === "ACCEPTED"
+  );
+  const processedMessages = messages.filter(
+    (m) => m.status !== "QUEUED" && m.status !== "ACCEPTED"
+  );
+
+  const filteredProcessed = useMemo(
+    () =>
+      processedFilter === "all"
+        ? processedMessages
+        : processedMessages.filter((m) => m.status === processedFilter),
+    [processedMessages, processedFilter]
+  );
+
+  const filterCounts = useMemo(() => {
+    const counts: Record<ProcessedFilter, number> = {
+      all: processedMessages.length,
+      SENT: 0,
+      DELIVERED: 0,
+      FAILED: 0,
+    };
+    for (const m of processedMessages) {
+      if (m.status in counts) counts[m.status as ProcessedFilter]++;
+    }
+    return counts;
+  }, [processedMessages]);
+
   if (loading) {
     return (
       <div className="flex items-center justify-center py-12 text-muted-foreground">
@@ -71,36 +111,21 @@ export function MessageList({ refreshTrigger }: MessageListProps) {
     );
   }
 
-  if (messages.length === 0) {
-    return (
-      <div className="text-center py-12 text-muted-foreground">
-        <p className="text-sm">No messages yet.</p>
-        <p className="text-xs mt-1">
-          Click <strong>New Message</strong> to schedule your first message.
-        </p>
-      </div>
-    );
-  }
-
-  const queuedMessages = messages.filter((m) => m.status === "QUEUED");
-  const otherMessages = messages.filter((m) => m.status !== "QUEUED");
-
   return (
-    <div className="space-y-6">
-      {queuedMessages.length > 0 && (
-        <div>
-          <div className="flex items-center justify-between mb-3">
-            <div className="flex items-center gap-2">
-              <div className="h-2 w-2 rounded-full bg-primary" />
-              <h3 className="text-sm font-semibold">
-                Scheduled Messages
-              </h3>
-            </div>
-            <span className="text-xs text-muted-foreground">
-              ({queuedMessages.length})
-            </span>
+    <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 h-[calc(100vh-theme(spacing.14)-theme(spacing.12))]">
+      {/* Queue column */}
+      <div className="flex flex-col min-h-0">
+        <div className="flex items-center justify-between mb-3 shrink-0">
+          <div className="flex items-center gap-2">
+            <Clock className="h-4 w-4 text-primary" />
+            <h3 className="text-sm font-semibold">Queue</h3>
           </div>
-          <div className="space-y-2">
+          <span className="text-xs text-muted-foreground">
+            ({queuedMessages.length})
+          </span>
+        </div>
+        {queuedMessages.length > 0 ? (
+          <div className="space-y-2 overflow-y-auto min-h-0 flex-1 p-px">
             {queuedMessages.map((message) => (
               <MessageCard
                 key={message.id}
@@ -109,29 +134,63 @@ export function MessageList({ refreshTrigger }: MessageListProps) {
               />
             ))}
           </div>
-        </div>
-      )}
-
-      {otherMessages.length > 0 && (
-        <div>
-          <div className="flex items-center justify-between mb-3">
-            <div className="flex items-center gap-2">
-              <div className="h-2 w-2 rounded-full bg-emerald-500" />
-              <h3 className="text-sm font-semibold">
-                Processed Messages
-              </h3>
-            </div>
-            <span className="text-xs text-muted-foreground">
-              ({otherMessages.length})
-            </span>
+        ) : (
+          <div className="flex flex-col items-center justify-center py-10 text-muted-foreground border border-dashed rounded-xl">
+            <Inbox className="h-5 w-5 mb-2" />
+            <p className="text-xs">Queue is empty</p>
+            <Button
+              variant="outline"
+              size="sm"
+              className="mt-3"
+              onClick={() => setOpen(true)}
+            >
+              <Plus className="h-3.5 w-3.5 mr-1.5" />
+              Schedule Message
+            </Button>
           </div>
-          <div className="space-y-2">
-            {otherMessages.map((message) => (
+        )}
+      </div>
+
+      {/* Processed column */}
+      <div className="flex flex-col min-h-0">
+        <div className="flex items-center justify-between mb-3 shrink-0">
+          <div className="flex items-center gap-2">
+            <div className="h-2 w-2 rounded-full bg-emerald-500" />
+            <h3 className="text-sm font-semibold">Processed</h3>
+          </div>
+          {processedMessages.length > 0 && (
+            <div className="flex items-center gap-1">
+              {filterChips.map((chip) => (
+                <Button
+                  key={chip.value}
+                  variant={processedFilter === chip.value ? "default" : "outline"}
+                  size="xs"
+                  onClick={() => setProcessedFilter(chip.value)}
+                >
+                  {chip.label}
+                  <span className="ml-1 opacity-60">{filterCounts[chip.value]}</span>
+                </Button>
+              ))}
+            </div>
+          )}
+        </div>
+        {filteredProcessed.length > 0 ? (
+          <div className="space-y-2 overflow-y-auto min-h-0 flex-1 p-px">
+            {filteredProcessed.map((message) => (
               <MessageCard key={message.id} message={message} />
             ))}
           </div>
-        </div>
-      )}
+        ) : (
+          <div className="flex flex-col items-center justify-center py-10 text-muted-foreground border border-dashed rounded-xl">
+            <Inbox className="h-5 w-5 mb-2" />
+            <p className="text-xs">
+              {processedMessages.length > 0
+                ? "No messages match this filter"
+                : "No messages processed yet"}
+            </p>
+          </div>
+        )}
+      </div>
     </div>
   );
 }
