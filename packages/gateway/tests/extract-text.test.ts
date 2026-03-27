@@ -48,6 +48,24 @@ function buildBlob(text: string, options?: { prefix?: Buffer; suffix?: Buffer })
   return Buffer.concat([prefix, marker, lengthBuf, textBuf, suffix]);
 }
 
+function build32BitBlob(
+  text: string,
+  options?: { prefix?: Buffer; suffix?: Buffer },
+): Buffer {
+  const textBuf = Buffer.from(text, "utf-8");
+  const marker = Buffer.from([0x84, 0x01, 0x2b, 0x82]);
+  const lengthBuf = Buffer.alloc(4);
+  lengthBuf.writeUInt32LE(textBuf.length, 0);
+
+  return Buffer.concat([
+    options?.prefix ?? Buffer.alloc(0),
+    marker,
+    lengthBuf,
+    textBuf,
+    options?.suffix ?? Buffer.alloc(0),
+  ]);
+}
+
 describe("extractTextFromAttributedBody", () => {
   describe("structured marker extraction", () => {
     it("should extract a short message (single-byte length)", () => {
@@ -98,6 +116,12 @@ describe("extractTextFromAttributedBody", () => {
       expect(result).toBe(text);
     });
 
+    it("should extract a 32-bit length message when the text is larger than 65535 bytes", () => {
+      const text = "L".repeat(70000);
+      const result = extractTextFromAttributedBody(build32BitBlob(text));
+      expect(result).toBe(text);
+    });
+
     it("should handle empty text (zero length)", () => {
       const blob = Buffer.concat([
         Buffer.from([0x00, 0x84, 0x01, 0x2b, 0x00]), // marker + length 0
@@ -136,6 +160,30 @@ describe("extractTextFromAttributedBody", () => {
       const blob = Buffer.from([0x84, 0x01, 0x2b, 0x81, 0x80]);
       expect(extractTextFromAttributedBody(blob)).toBeNull();
     });
+
+    it("should handle blob with 0x82 length tag but truncated payload", () => {
+      const blob = Buffer.from([
+        0x84, 0x01, 0x2b, 0x82,
+        0x10, 0x00, 0x00, 0x00,
+        0x41, 0x42,
+      ]);
+      expect(extractTextFromAttributedBody(blob)).toBe("AB");
+    });
+
+    it("should decode exact-end single-byte payloads without treating them as truncated", () => {
+      const blob = Buffer.concat([
+        Buffer.from([0x84, 0x01, 0x2b, 0x05]),
+        Buffer.from("Hello"),
+      ]);
+      expect(extractTextFromAttributedBody(blob)).toBe("Hello");
+    });
+
+    it("should decode exact-end 16-bit payloads without treating them as truncated", () => {
+      const text = "Edge".repeat(32);
+      const blob = buildBlob(text, { prefix: Buffer.alloc(0), suffix: Buffer.alloc(0) });
+      expect(Buffer.from(text).length).toBe(128);
+      expect(extractTextFromAttributedBody(blob)).toBe(text);
+    });
   });
 
   describe("fallback text extraction", () => {
@@ -165,12 +213,42 @@ describe("extractTextFromAttributedBody", () => {
       expect(result).toBe("This is actually the real message content here");
     });
 
+    it("should ignore metadata strings even when they are longer than the actual message", () => {
+      const blob = Buffer.concat([
+        Buffer.from("NSMutableAttributedString"),
+        Buffer.from([0x00]),
+        Buffer.from("NSAttributedString"),
+        Buffer.from([0x00]),
+        Buffer.from("short but real"),
+      ]);
+
+      expect(extractTextFromAttributedBody(blob)).toBe("short but real");
+    });
+
     it("should handle emoji in fallback path", () => {
       const noise = Buffer.from([0xff, 0xfe, 0x00]);
       const textBytes = Buffer.from("Hey \u{1F600}\u{1F389}!");
       const blob = Buffer.concat([noise, textBytes, noise]);
       const result = extractTextFromAttributedBody(blob);
       expect(result).toBe("Hey \u{1F600}\u{1F389}!");
+    });
+
+    it("should preserve accented latin characters in fallback text extraction", () => {
+      const blob = Buffer.concat([
+        Buffer.from([0xff, 0x00]),
+        Buffer.from("Ol\u00e1 caf\u00e9"),
+        Buffer.from([0x00, 0xff]),
+      ]);
+      expect(extractTextFromAttributedBody(blob)).toBe("Ol\u00e1 caf\u00e9");
+    });
+
+    it("should preserve tabs and newlines in fallback text extraction", () => {
+      const blob = Buffer.concat([
+        Buffer.from([0xff]),
+        Buffer.from("line 1\nline\t2"),
+        Buffer.from([0x00]),
+      ]);
+      expect(extractTextFromAttributedBody(blob)).toBe("line 1\nline\t2");
     });
 
     it("should return null for blob with no readable text", () => {

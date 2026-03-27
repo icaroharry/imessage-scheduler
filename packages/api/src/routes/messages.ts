@@ -26,9 +26,9 @@ const updateMessageSchema = z.object({
   status: z
     .enum(["QUEUED", "ACCEPTED", "SENT", "DELIVERED", "FAILED"])
     .optional(),
-  errorMessage: z.string().optional(),
-  sentAt: z.string().optional(),
-  deliveredAt: z.string().optional(),
+  errorMessage: z.string().nullable().optional(),
+  sentAt: z.string().datetime().nullable().optional(),
+  deliveredAt: z.string().datetime().nullable().optional(),
 });
 
 export const messagesRouter = new Hono<Env>()
@@ -158,12 +158,14 @@ export const messagesRouter = new Hono<Env>()
       updatedAt: new Date().toISOString(),
     };
 
-    if (parsed.data.status) updateData.status = parsed.data.status;
-    if (parsed.data.errorMessage)
+    if (parsed.data.status !== undefined) updateData.status = parsed.data.status;
+    if (parsed.data.errorMessage !== undefined) {
       updateData.errorMessage = parsed.data.errorMessage;
-    if (parsed.data.sentAt) updateData.sentAt = parsed.data.sentAt;
-    if (parsed.data.deliveredAt)
+    }
+    if (parsed.data.sentAt !== undefined) updateData.sentAt = parsed.data.sentAt;
+    if (parsed.data.deliveredAt !== undefined) {
       updateData.deliveredAt = parsed.data.deliveredAt;
+    }
 
     const result = db
       .update(messages)

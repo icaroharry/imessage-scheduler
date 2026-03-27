@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { render, screen, waitFor } from "@testing-library/react";
+import { act, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MessageList } from "@/components/message-list";
 import { createMessage } from "./fixtures";
@@ -373,13 +373,17 @@ describe("MessageList", () => {
       expect(mockApi.getMessages).toHaveBeenCalledTimes(1);
     });
 
-    vi.advanceTimersByTime(10000);
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(10000);
+    });
 
     await waitFor(() => {
       expect(mockApi.getMessages).toHaveBeenCalledTimes(2);
     });
 
-    vi.advanceTimersByTime(10000);
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(10000);
+    });
 
     await waitFor(() => {
       expect(mockApi.getMessages).toHaveBeenCalledTimes(3);

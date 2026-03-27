@@ -80,6 +80,7 @@ describe("Messages API", () => {
       expect(res.status).toBe(400);
       const json = await res.json();
       expect(json.error).toBe("Validation failed");
+      expect(json.details.phone).toContain("Phone number is required");
     });
 
     it("should reject empty message body", async () => {
@@ -93,6 +94,9 @@ describe("Messages API", () => {
       });
 
       expect(res.status).toBe(400);
+      const json = await res.json();
+      expect(json.error).toBe("Validation failed");
+      expect(json.details.body).toContain("Message body is required");
     });
 
     it("should reject invalid phone number format", async () => {
@@ -106,6 +110,9 @@ describe("Messages API", () => {
       });
 
       expect(res.status).toBe(400);
+      const json = await res.json();
+      expect(json.error).toBe("Validation failed");
+      expect(json.details.phone).toContain("Invalid phone number format");
     });
 
     it("should accept phone numbers with various formats", async () => {
@@ -144,6 +151,37 @@ describe("Messages API", () => {
       expect(res.status).toBe(201);
       const json = await res.json();
       expect(json.data.scheduledAt).toBe(scheduledAt);
+    });
+
+    it("should reject a message body longer than 2000 characters", async () => {
+      const res = await app.request("/messages", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          phone: "+15551234567",
+          body: "A".repeat(2001),
+        }),
+      });
+
+      expect(res.status).toBe(400);
+      const json = await res.json();
+      expect(json.details.body).toContain("Message too long");
+    });
+
+    it("should reject an invalid scheduled_at timestamp", async () => {
+      const res = await app.request("/messages", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          phone: "+15551234567",
+          body: "Future message",
+          scheduledAt: "tomorrow-ish",
+        }),
+      });
+
+      expect(res.status).toBe(400);
+      const json = await res.json();
+      expect(json.details.scheduledAt).toBeDefined();
     });
   });
 
@@ -236,11 +274,17 @@ describe("Messages API", () => {
     it("should return 404 for non-existent message", async () => {
       const res = await app.request("/messages/99999");
       expect(res.status).toBe(404);
+
+      const json = await res.json();
+      expect(json.error).toBe("Message not found");
     });
 
     it("should return 400 for invalid ID", async () => {
       const res = await app.request("/messages/abc");
       expect(res.status).toBe(400);
+
+      const json = await res.json();
+      expect(json.error).toBe("Invalid message ID");
     });
   });
 
@@ -265,6 +309,7 @@ describe("Messages API", () => {
       expect(res.status).toBe(200);
       const json = await res.json();
       expect(json.data.status).toBe("SENT");
+      expect(json.data.sentAt).toBeNull();
     });
 
     it("should update error message", async () => {
@@ -293,6 +338,107 @@ describe("Messages API", () => {
       expect(json.data.errorMessage).toBe("Gateway timeout");
     });
 
+    it("should update timestamps and preserve nullable fields explicitly", async () => {
+      const createRes = await app.request("/messages", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          phone: "+15551234567",
+          body: "Hello!",
+        }),
+      });
+      const created = await createRes.json();
+      const sentAt = new Date("2026-03-26T12:00:00.000Z").toISOString();
+      const deliveredAt = new Date("2026-03-26T12:01:00.000Z").toISOString();
+
+      const res = await app.request(`/messages/${created.data.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          status: "DELIVERED",
+          sentAt,
+          deliveredAt,
+          errorMessage: "",
+        }),
+      });
+
+      expect(res.status).toBe(200);
+      const json = await res.json();
+      expect(json.data.status).toBe("DELIVERED");
+      expect(json.data.sentAt).toBe(sentAt);
+      expect(json.data.deliveredAt).toBe(deliveredAt);
+      expect(json.data.errorMessage).toBe("");
+      expect(json.data.updatedAt).not.toBe(created.data.updatedAt);
+    });
+
+    it("should allow clearing previously stored fields with null", async () => {
+      const createRes = await app.request("/messages", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          phone: "+15551234567",
+          body: "Hello!",
+        }),
+      });
+      const created = await createRes.json();
+      const sentAt = new Date("2026-03-26T12:00:00.000Z").toISOString();
+
+      await app.request(`/messages/${created.data.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          status: "FAILED",
+          sentAt,
+          deliveredAt: sentAt,
+          errorMessage: "temporary issue",
+        }),
+      });
+
+      const clearRes = await app.request(`/messages/${created.data.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          errorMessage: null,
+          sentAt: null,
+          deliveredAt: null,
+        }),
+      });
+
+      expect(clearRes.status).toBe(200);
+      const json = await clearRes.json();
+      expect(json.data.errorMessage).toBeNull();
+      expect(json.data.sentAt).toBeNull();
+      expect(json.data.deliveredAt).toBeNull();
+      expect(json.data.status).toBe("FAILED");
+    });
+
+    it("should reject invalid patch payloads", async () => {
+      const createRes = await app.request("/messages", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          phone: "+15551234567",
+          body: "Hello!",
+        }),
+      });
+      const created = await createRes.json();
+
+      const res = await app.request(`/messages/${created.data.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          status: "NOT_A_STATUS",
+          sentAt: "yesterday",
+        }),
+      });
+
+      expect(res.status).toBe(400);
+      const json = await res.json();
+      expect(json.error).toBe("Validation failed");
+      expect(json.details.status).toBeDefined();
+      expect(json.details.sentAt).toBeDefined();
+    });
+
     it("should return 404 for non-existent message", async () => {
       const res = await app.request("/messages/99999", {
         method: "PATCH",
@@ -301,6 +447,20 @@ describe("Messages API", () => {
       });
 
       expect(res.status).toBe(404);
+      const json = await res.json();
+      expect(json.error).toBe("Message not found");
+    });
+
+    it("should return 400 for invalid IDs", async () => {
+      const res = await app.request("/messages/not-a-number", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ status: "SENT" }),
+      });
+
+      expect(res.status).toBe(400);
+      const json = await res.json();
+      expect(json.error).toBe("Invalid message ID");
     });
   });
 
@@ -321,6 +481,8 @@ describe("Messages API", () => {
       });
 
       expect(res.status).toBe(200);
+      const json = await res.json();
+      expect(json.message).toBe("Message deleted");
 
       // Verify it's gone
       const getRes = await app.request(`/messages/${created.data.id}`);
@@ -350,6 +512,8 @@ describe("Messages API", () => {
       });
 
       expect(res.status).toBe(409);
+      const json = await res.json();
+      expect(json.error).toBe("Can only delete messages with QUEUED status");
     });
 
     it("should return 404 for non-existent message", async () => {
@@ -358,6 +522,18 @@ describe("Messages API", () => {
       });
 
       expect(res.status).toBe(404);
+      const json = await res.json();
+      expect(json.error).toBe("Message not found");
+    });
+
+    it("should return 400 for invalid IDs", async () => {
+      const res = await app.request("/messages/nope", {
+        method: "DELETE",
+      });
+
+      expect(res.status).toBe(400);
+      const json = await res.json();
+      expect(json.error).toBe("Invalid message ID");
     });
   });
 
@@ -395,6 +571,8 @@ describe("Messages API", () => {
       const json = await res.json();
       expect(json.data.total).toBe(3);
       expect(json.data.queued).toBe(1);
+      expect(json.data.accepted).toBe(0);
+      expect(json.data.sent).toBe(0);
       expect(json.data.delivered).toBe(1);
       expect(json.data.failed).toBe(1);
     });
@@ -406,6 +584,10 @@ describe("Messages API", () => {
       const json = await res.json();
       expect(json.data.total).toBe(0);
       expect(json.data.queued).toBe(0);
+      expect(json.data.accepted).toBe(0);
+      expect(json.data.sent).toBe(0);
+      expect(json.data.delivered).toBe(0);
+      expect(json.data.failed).toBe(0);
     });
   });
 

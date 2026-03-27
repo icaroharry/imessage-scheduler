@@ -11,8 +11,10 @@ test.describe("Create message via UI", () => {
 
     // Dialog should appear with the form
     await expect(
-      page.getByText("Enter a phone number and message"),
+      page.getByRole("heading", { name: /new message/i }),
     ).toBeVisible();
+    await expect(page.locator("input#phone")).toBeVisible();
+    await expect(page.locator("textarea#message")).toBeVisible();
 
     // Fill in the form
     await page.locator("input#phone").fill("+15559001001");
