@@ -16,20 +16,20 @@ describe("MessageCard", () => {
     it("displays the created date", () => {
       render(<MessageCard message={messages.queued} />);
 
-      // formatDate produces something like "Mar 26, 2026, 10:00 AM"
-      expect(screen.getByText(/Mar 26, 2026/)).toBeInTheDocument();
+      // formatDate produces something like "Mar 26, 7:00 AM"
+      expect(screen.getByText(/Mar 26/)).toBeInTheDocument();
     });
 
     it("displays sent date when available", () => {
       render(<MessageCard message={messages.sent} />);
 
-      expect(screen.getByText(/Sent:/)).toBeInTheDocument();
+      expect(screen.getByText(/Sent Mar/)).toBeInTheDocument();
     });
 
     it("does not display sent date when absent", () => {
       render(<MessageCard message={messages.queued} />);
 
-      expect(screen.queryByText(/Sent:/)).not.toBeInTheDocument();
+      expect(screen.queryByText(/Sent Mar/)).not.toBeInTheDocument();
     });
   });
 

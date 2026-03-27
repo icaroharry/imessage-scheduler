@@ -1,12 +1,19 @@
 "use client";
 
 import { useState, useTransition } from "react";
+import { motion, AnimatePresence } from "motion/react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { api } from "@/lib/api";
 import { Send } from "lucide-react";
+import {
+  formContainerVariants,
+  formFieldVariants,
+  bannerVariants,
+  shakeVariants,
+} from "@/components/motion-primitives";
 
 interface ScheduleFormProps {
   onMessageCreated?: () => void;
@@ -33,14 +40,22 @@ export function ScheduleForm({ onMessageCreated }: ScheduleFormProps) {
         onMessageCreated?.();
         setTimeout(() => setSuccess(false), 3000);
       } catch (err) {
-        setError(err instanceof Error ? err.message : "Failed to schedule message");
+        setError(
+          err instanceof Error ? err.message : "Failed to schedule message"
+        );
       }
     });
   };
 
   return (
-    <form onSubmit={handleSubmit} className="space-y-4">
-      <div className="space-y-2">
+    <motion.form
+      onSubmit={handleSubmit}
+      className="space-y-4"
+      variants={formContainerVariants}
+      initial="hidden"
+      animate="show"
+    >
+      <motion.div className="space-y-2" variants={formFieldVariants}>
         <Label htmlFor="phone">Phone Number</Label>
         <Input
           id="phone"
@@ -51,9 +66,9 @@ export function ScheduleForm({ onMessageCreated }: ScheduleFormProps) {
           required
           className="h-11"
         />
-      </div>
+      </motion.div>
 
-      <div className="space-y-2">
+      <motion.div className="space-y-2" variants={formFieldVariants}>
         <Label htmlFor="message">Message</Label>
         <Textarea
           id="message"
@@ -68,28 +83,52 @@ export function ScheduleForm({ onMessageCreated }: ScheduleFormProps) {
         <div className="text-xs text-muted-foreground text-right">
           {body.length}/2000
         </div>
-      </div>
+      </motion.div>
 
-      {error && (
-        <div className="text-sm text-destructive bg-destructive/10 rounded-lg p-3">
-          {error}
-        </div>
-      )}
+      <AnimatePresence>
+        {error && (
+          <motion.div
+            key="error"
+            variants={shakeVariants}
+            initial="hidden"
+            animate="show"
+            exit="exit"
+            className="overflow-hidden"
+          >
+            <div className="text-sm text-destructive bg-destructive/10 rounded-lg p-3">
+              {error}
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
-      {success && (
-        <div className="text-sm text-emerald-700 bg-emerald-50 rounded-lg p-3">
-          Message scheduled successfully!
-        </div>
-      )}
+      <AnimatePresence>
+        {success && (
+          <motion.div
+            key="success"
+            variants={bannerVariants}
+            initial="hidden"
+            animate="show"
+            exit="exit"
+            className="overflow-hidden"
+          >
+            <div className="text-sm text-emerald-700 bg-emerald-50 rounded-lg p-3">
+              Message scheduled successfully!
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
-      <Button
-        type="submit"
-        disabled={isPending || !phone || !body}
-        className="w-full h-11 text-base font-semibold"
-      >
-        <Send className="mr-2 h-4 w-4" />
-        {isPending ? "Scheduling..." : "Schedule Message"}
-      </Button>
-    </form>
+      <motion.div variants={formFieldVariants}>
+        <Button
+          type="submit"
+          disabled={isPending || !phone || !body}
+          className="w-full h-11 text-base font-semibold"
+        >
+          <Send className="mr-2 h-4 w-4" />
+          {isPending ? "Scheduling..." : "Schedule Message"}
+        </Button>
+      </motion.div>
+    </motion.form>
   );
 }

@@ -5,6 +5,10 @@ export default defineConfig({
   resolve: {
     alias: {
       "@": path.resolve(__dirname, "./src"),
+      "motion/react": path.resolve(
+        __dirname,
+        "./tests/__mocks__/motion-react.tsx"
+      ),
     },
   },
   test: {

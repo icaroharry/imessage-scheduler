@@ -1,6 +1,7 @@
 "use client"
 
 import { createContext, useContext, useState, useCallback } from "react"
+import { motion } from "motion/react"
 import { AppSidebar } from "@/components/app-sidebar"
 import { SidebarInset, SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar"
 import { TooltipProvider } from "@/components/ui/tooltip"
@@ -15,6 +16,7 @@ import { Button } from "@/components/ui/button"
 import { NewMessageDialog } from "@/components/new-message-dialog"
 import { usePathname } from "next/navigation"
 import { Plus } from "lucide-react"
+import { SPRING_BOUNCY } from "@/components/motion-primitives"
 
 const pageTitles: Record<string, string> = {
   "/": "Messages",
@@ -72,14 +74,19 @@ export function SidebarLayout({ children }: { children: React.ReactNode }) {
                 </Breadcrumb>
               </div>
               <div className="px-4">
-                <Button
-                  size="sm"
-                  onClick={() => setDialogOpen(true)}
+                <motion.div
+                  whileTap={{ scale: 0.95 }}
+                  transition={SPRING_BOUNCY}
                 >
-                  <Plus className="h-4 w-4 mr-1.5" />
-                  <span className="hidden sm:inline">New Message</span>
-                  <span className="sm:hidden">New</span>
-                </Button>
+                  <Button
+                    size="sm"
+                    onClick={() => setDialogOpen(true)}
+                  >
+                    <Plus className="h-4 w-4 mr-1.5" />
+                    <span className="hidden sm:inline">New Message</span>
+                    <span className="sm:hidden">New</span>
+                  </Button>
+                </motion.div>
               </div>
             </header>
             <div className="flex-1">

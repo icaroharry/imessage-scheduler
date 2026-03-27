@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { motion } from "motion/react";
 import { Card, CardContent } from "@/components/ui/card";
 import { api } from "@/lib/api";
 import type { Stats } from "@/lib/api";
@@ -12,6 +13,10 @@ import {
   MessageSquare,
   Loader2,
 } from "lucide-react";
+import {
+  statContainerVariants,
+  statCardVariants,
+} from "@/components/motion-primitives";
 
 const statCards = [
   {
@@ -92,30 +97,39 @@ export function DashboardStats() {
   }
 
   return (
-    <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
+    <motion.div
+      className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3"
+      variants={statContainerVariants}
+      initial="hidden"
+      animate="show"
+    >
       {statCards.map((card) => {
         const Icon = card.icon;
         const spinning = "spinning" in card && card.spinning;
         return (
-          <Card key={card.key} className="transition-colors hover:bg-accent/30">
-            <CardContent className="py-4 px-4">
-              <div className="flex items-center gap-2 mb-1">
-                <div
-                  className={`h-7 w-7 rounded-lg ${card.bg} flex items-center justify-center`}
-                >
-                  <Icon className={`h-4 w-4 ${card.color}${spinning ? " animate-spin" : ""}`} />
+          <motion.div key={card.key} variants={statCardVariants}>
+            <Card className="transition-colors hover:bg-accent/30">
+              <CardContent className="py-4 px-4">
+                <div className="flex items-center gap-2 mb-1">
+                  <div
+                    className={`h-7 w-7 rounded-lg ${card.bg} flex items-center justify-center`}
+                  >
+                    <Icon
+                      className={`h-4 w-4 ${card.color}${spinning ? " animate-spin" : ""}`}
+                    />
+                  </div>
                 </div>
-              </div>
-              <div className="mt-2">
-                <div className="text-2xl font-bold">
-                  {stats[card.key]}
+                <div className="mt-2">
+                  <div className="text-2xl font-bold">{stats[card.key]}</div>
+                  <div className="text-xs text-muted-foreground">
+                    {card.label}
+                  </div>
                 </div>
-                <div className="text-xs text-muted-foreground">{card.label}</div>
-              </div>
-            </CardContent>
-          </Card>
+              </CardContent>
+            </Card>
+          </motion.div>
         );
       })}
-    </div>
+    </motion.div>
   );
 }
