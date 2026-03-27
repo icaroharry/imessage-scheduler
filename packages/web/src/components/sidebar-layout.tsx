@@ -43,7 +43,7 @@ export function useNewMessage() {
 
 export function SidebarLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname()
-  const pageTitle = pageTitles[pathname] || "iScheduler"
+  const pageTitle = pageTitles[pathname] || "Sendpurple"
   const [dialogOpen, setDialogOpen] = useState(false)
   const [refreshKey, setRefreshKey] = useState(0)
 

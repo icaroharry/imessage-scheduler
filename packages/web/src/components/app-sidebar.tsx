@@ -1,6 +1,7 @@
 "use client"
 
 import * as React from "react"
+import Image from "next/image"
 import Link from "next/link"
 import { usePathname } from "next/navigation"
 
@@ -16,33 +17,26 @@ import {
   SidebarMenuButton,
   SidebarMenuItem,
 } from "@/components/ui/sidebar"
-import {
-  MessageSquare,
-  LayoutDashboard,
-  Settings,
-  Send,
-  Activity,
-  Clock,
-} from "lucide-react"
+import { MessageSquare, Clock } from "lucide-react"
 import { useSSEData } from "@/components/sse-provider"
 
 const navItems = [
   {
-    title: "Schedule",
+    title: "Queue",
     url: "/",
-    icon: Send,
+    icon: "/icons/queue.svg",
     description: "Schedule new messages",
   },
   {
-    title: "Dashboard",
+    title: "Metrics",
     url: "/dashboard",
-    icon: LayoutDashboard,
+    icon: "/icons/metrics.svg",
     description: "Monitor all messages",
   },
   {
     title: "Settings",
     url: "/settings",
-    icon: Settings,
+    icon: "/icons/settings.svg",
     description: "Scheduler configuration",
   },
 ]
@@ -54,7 +48,7 @@ function GatewayStatus() {
     <div className="px-2 py-2">
       <div className="rounded-lg border bg-card p-3 text-card-foreground shadow-sm">
         <div className="flex items-center gap-2 text-xs font-medium text-muted-foreground mb-2">
-          <Activity className="h-3 w-3" />
+          <MessageSquare className="h-3 w-3" />
           System Status
         </div>
         <div className="space-y-1.5">
@@ -109,11 +103,17 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
         <SidebarMenu>
           <SidebarMenuItem>
             <SidebarMenuButton size="lg" render={<Link href="/" />}>
-              <div className="flex aspect-square size-8 items-center justify-center rounded-lg bg-primary text-primary-foreground">
-                <MessageSquare className="size-4" />
+              <div className="flex aspect-square size-8 items-center justify-center rounded-xl bg-[linear-gradient(180deg,rgba(211,200,249,0.7),rgba(211,200,249,0.3))] ring-1 ring-[#846FEB]/15">
+                <Image
+                  src="/icons/logo.svg"
+                  alt="Sendpurple"
+                  width={48}
+                  height={48}
+                  className="size-5 object-contain"
+                />
               </div>
               <div className="grid flex-1 text-left text-sm leading-tight">
-                <span className="truncate font-bold">iScheduler</span>
+                <span className="truncate font-bold">Sendpurple</span>
                 <span className="truncate text-xs text-muted-foreground">
                   iMessage Automation
                 </span>
@@ -135,7 +135,14 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
                     isActive={isActive}
                     render={<Link href={item.url} />}
                   >
-                    <item.icon />
+                    <Image
+                      src={item.icon}
+                      alt=""
+                      aria-hidden="true"
+                      width={48}
+                      height={48}
+                      className="size-4.5 object-contain"
+                    />
                     <span>{item.title}</span>
                   </SidebarMenuButton>
                 </SidebarMenuItem>

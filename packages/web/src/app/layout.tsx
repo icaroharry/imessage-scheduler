@@ -16,7 +16,7 @@ const jetbrainsMono = JetBrains_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "iScheduler - iMessage Scheduler",
+  title: "Sendpurple - iMessage Scheduler",
   description: "Schedule and manage iMessages with a beautiful interface",
 };
 
