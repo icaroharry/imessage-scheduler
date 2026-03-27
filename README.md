@@ -43,6 +43,13 @@ pnpm dev
 
 Then open [http://localhost:3000](http://localhost:3000) in your browser.
 
+## UI Theme
+
+The web UI theme is based on a `tweakcn` theme registry entry:
+`https://tweakcn.com/r/themes/cmm3earjf000004lbbthuasae`
+
+Theme credit goes to the original creator on `tweakcn`.
+
 ## Services
 
 | Service | Port | Description |
