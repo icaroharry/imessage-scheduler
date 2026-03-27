@@ -2,6 +2,16 @@
 
 A fullstack iMessage scheduling system with a FIFO queue, configurable send intervals, and a delivery dashboard.
 
+## Screenshots
+
+| Messages Queue | Dashboard |
+|:-:|:-:|
+| ![Messages Queue](docs/screenshots/schedule-message.png) | ![Dashboard](docs/screenshots/dashboard.png) |
+
+| New Message | Settings |
+|:-:|:-:|
+| ![New Message](docs/screenshots/new-message.png) | ![Settings](docs/screenshots/settings.png) |
+
 ## Architecture
 
 ```
@@ -146,3 +156,18 @@ pnpm test:e2e:browser:ui
 - **Gateway**: Hono, osascript (AppleScript)
 - **Testing**: Vitest (unit tests), Playwright (e2e — API + browser)
 - **Monorepo**: pnpm workspaces
+
+## Dev Tools Used
+
+- **Claude Code** (Opus 4.6) + **Codex** (GPT 5.4) — AI-assisted development and code generation
+- **T3 Code** — Full-stack project scaffolding and best practices
+- **Next.js DevTools MCP** and best practices — Development tooling and framework conventions
+- **Stryker** — Mutation testing for code quality assurance
+- **Frontend Design Skills** — UI/UX design and implementation
+
+## Roadmap
+
+- [ ] Add pagination to the messages list
+- [ ] Improve mobile interactions
+- [ ] Improve field validation
+- [ ] Use toaster for displaying errors and messages
